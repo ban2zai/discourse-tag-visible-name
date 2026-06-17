@@ -9,10 +9,16 @@ module ::DiscourseTagVisibleName
 
     class << self
       def list
-        tags = ::Tag.order(:name).pluck(:id, :name, :topic_count)
+        count_column = topic_count_column
+        columns = [:id, :name]
+        columns << count_column if count_column
+
+        tags = ::Tag.order(:name).pluck(*columns)
         visible_names = mapping
 
-        tags.map do |id, name, topic_count|
+        tags.map do |row|
+          id, name, topic_count = row
+
           {
             id: id,
             name: name,
@@ -25,6 +31,16 @@ module ::DiscourseTagVisibleName
       def mapping
         raw = ::PluginStore.get(::DiscourseTagVisibleName::PLUGIN_NAME, STORE_KEY)
         raw.is_a?(Hash) ? raw : {}
+      end
+
+      def topic_count_for(tag)
+        if tag.respond_to?(:topic_count)
+          tag.topic_count || 0
+        elsif tag.respond_to?(:public_topic_count)
+          tag.public_topic_count || 0
+        else
+          0
+        end
       end
 
       def visible_name_for(tag)
@@ -72,6 +88,16 @@ module ::DiscourseTagVisibleName
       end
 
       private
+
+      def topic_count_column
+        columns = ::Tag.column_names
+
+        if columns.include?("topic_count")
+          :topic_count
+        elsif columns.include?("public_topic_count")
+          :public_topic_count
+        end
+      end
 
       def save_mapping!(visible_names)
         clean_mapping =

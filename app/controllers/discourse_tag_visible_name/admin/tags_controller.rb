@@ -24,7 +24,10 @@ module ::DiscourseTagVisibleName
                    id: tag.id,
                    name: tag.name,
                    visible_name: visible_name,
-                   topic_count: tag.topic_count || 0,
+                   topic_count:
+                     ::DiscourseTagVisibleName::TagVisibleNameStore.topic_count_for(
+                       tag,
+                     ),
                  },
                }
       end

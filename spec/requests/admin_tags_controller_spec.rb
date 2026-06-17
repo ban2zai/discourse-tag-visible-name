@@ -5,9 +5,17 @@ require "rails_helper"
 RSpec.describe "Tag visible names admin API" do
   fab!(:admin)
   fab!(:user)
-  fab!(:tag) { Fabricate(:tag, name: "бгу", topic_count: 2) }
+  fab!(:tag) { Fabricate(:tag, name: "бгу") }
 
-  before { SiteSetting.tag_visible_name_enabled = true }
+  before do
+    SiteSetting.tag_visible_name_enabled = true
+
+    if ::Tag.column_names.include?("topic_count")
+      tag.update_column(:topic_count, 2)
+    elsif ::Tag.column_names.include?("public_topic_count")
+      tag.update_column(:public_topic_count, 2)
+    end
+  end
 
   describe "GET /admin/plugins/tag-visible-names/tags" do
     it "rejects anonymous users" do
