@@ -18,9 +18,3 @@ end
 
 require_relative "lib/discourse_tag_visible_name/engine"
 require_relative "lib/discourse_tag_visible_name/tag_visible_name_store"
-
-after_initialize do
-  add_to_serializer(:site, :tag_visible_names) do
-    ::DiscourseTagVisibleName::TagVisibleNameStore.mapping
-  end
-end

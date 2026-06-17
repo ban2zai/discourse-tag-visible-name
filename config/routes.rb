@@ -1,6 +1,11 @@
 # frozen_string_literal: true
 
 Discourse::Application.routes.append do
+  get "/tag-visible-names" => "discourse_tag_visible_name/public#index",
+      defaults: {
+        format: :json,
+      }
+
   get "/admin/plugins/tag-visible-names" => "admin/plugins#index",
       constraints: StaffConstraint.new
 

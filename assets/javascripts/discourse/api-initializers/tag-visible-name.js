@@ -1,8 +1,5 @@
 import { apiInitializer } from "discourse/lib/api";
-
-function visibleNameMap(api) {
-  return api.container.lookup("service:site")?.tag_visible_names || {};
-}
+import { ajax } from "discourse/lib/ajax";
 
 function updateTagElement(element, names) {
   const tagName = element.dataset.tagName;
@@ -38,9 +35,17 @@ export default apiInitializer("1.8.0", (api) => {
     return;
   }
 
-  const names = visibleNameMap(api);
+  let names = {};
 
-  updateTagElements(document, names);
+  ajax("/tag-visible-names.json")
+    .then((data) => {
+      names = data.tag_visible_names || {};
+      updateTagElements(document, names);
+    })
+    .catch(() => {
+      names = {};
+    });
+
   api.onPageChange(() => updateTagElements(document, names));
 
   const observer = new MutationObserver((mutations) => {
