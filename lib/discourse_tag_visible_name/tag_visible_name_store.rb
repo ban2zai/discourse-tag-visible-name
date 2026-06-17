@@ -40,20 +40,49 @@ module ::DiscourseTagVisibleName
       def visible_name_for(tag)
         return if tag.blank?
 
-        tag.custom_fields[::DiscourseTagVisibleName::CUSTOM_FIELD_NAME].presence
+        ::DB
+          .query_single(
+            <<~SQL,
+              SELECT value
+              FROM tag_custom_fields
+              WHERE tag_id = :tag_id
+                AND name = :field_name
+              LIMIT 1
+            SQL
+            tag_id: tag.id,
+            field_name: ::DiscourseTagVisibleName::CUSTOM_FIELD_NAME,
+          )
+          .first
+          .presence
       end
 
       def save!(tag, visible_name)
         value = visible_name.to_s.strip
 
+        ::DB.exec(
+          <<~SQL,
+            DELETE FROM tag_custom_fields
+            WHERE tag_id = :tag_id
+              AND name = :field_name
+          SQL
+          tag_id: tag.id,
+          field_name: ::DiscourseTagVisibleName::CUSTOM_FIELD_NAME,
+        )
+
         if value.blank?
-          tag.custom_fields.delete(::DiscourseTagVisibleName::CUSTOM_FIELD_NAME)
-          tag.save_custom_fields
           return nil
         end
 
-        tag.custom_fields[::DiscourseTagVisibleName::CUSTOM_FIELD_NAME] = value
-        tag.save_custom_fields
+        ::DB.exec(
+          <<~SQL,
+            INSERT INTO tag_custom_fields (tag_id, name, value, created_at, updated_at)
+            VALUES (:tag_id, :field_name, :value, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+          SQL
+          tag_id: tag.id,
+          field_name: ::DiscourseTagVisibleName::CUSTOM_FIELD_NAME,
+          value: value,
+        )
+
         value
       end
 
