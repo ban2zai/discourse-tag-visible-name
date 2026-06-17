@@ -1,0 +1,15 @@
+ru:
+  js:
+    tag_visible_name:
+      admin:
+        title: "Отображаемые имена тегов"
+        description: "Задайте подпись, которую пользователи будут видеть вместо системного slug тега."
+        search_placeholder: "Найти тег"
+        loading: "Загрузка тегов..."
+        load_error: "Не удалось загрузить список тегов."
+        slug: "Тег"
+        visible_name: "Отображаемое имя"
+        topic_count: "Тем"
+        save: "Сохранить"
+        saving: "Сохранение..."
+        save_error: "Не удалось сохранить."

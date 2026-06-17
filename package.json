@@ -1,0 +1,12 @@
+{
+  "name": "discourse-tag-visible-name",
+  "version": "0.1.0",
+  "repository": "https://github.com/ban2zai/discourse-tag-visible-name",
+  "author": "ban2zai",
+  "license": "MIT",
+  "private": true,
+  "devDependencies": {
+    "eslint-config-discourse": "latest",
+    "prettier": "latest"
+  }
+}

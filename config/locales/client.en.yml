@@ -1,0 +1,15 @@
+en:
+  js:
+    tag_visible_name:
+      admin:
+        title: "Tag display names"
+        description: "Set the label users see instead of the system tag slug."
+        search_placeholder: "Find a tag"
+        loading: "Loading tags..."
+        load_error: "Failed to load tags."
+        slug: "Tag"
+        visible_name: "Display name"
+        topic_count: "Topics"
+        save: "Save"
+        saving: "Saving..."
+        save_error: "Failed to save."
