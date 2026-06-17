@@ -8,43 +8,17 @@ module ::DiscourseTagVisibleName
       before_action :ensure_site_admin
 
       def index
-        render json: { tags: ::DiscourseTagVisibleName::TagVisibleNameStore.list }
+        render json: ::DiscourseTagVisibleName::TagVisibleNameStore.list
       end
 
       def update
-        tag = ::Tag.find(params[:id])
-        visible_name =
-          ::DiscourseTagVisibleName::TagVisibleNameStore.save!(
-            tag,
-            params[:visible_name],
-          )
+        ::DiscourseTagVisibleName::TagVisibleNameStore.save_all!(
+          tags: params[:tags] || [],
+          tag_group_styles: params[:tag_group_styles] || {},
+          tag_styles: params[:tag_styles] || {},
+        )
 
-        render json: {
-                 tag: {
-                   id: tag.id,
-                   name: tag.name,
-                   visible_name: visible_name,
-                   topic_count:
-                     ::DiscourseTagVisibleName::TagVisibleNameStore.topic_count_for(
-                       tag,
-                     ),
-                 },
-               }
-      end
-
-      def import
-        mapping =
-          ::DiscourseTagVisibleName::TagVisibleNameStore.parse_mapping(
-            params[:content],
-            params[:format],
-          )
-
-        render json:
-                 ::DiscourseTagVisibleName::TagVisibleNameStore.import_mapping!(
-                   mapping,
-                 )
-      rescue ArgumentError, JSON::ParserError, Psych::Exception => e
-        render json: { error: e.message }, status: 422
+        render json: ::DiscourseTagVisibleName::TagVisibleNameStore.list
       end
 
       private

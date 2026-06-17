@@ -15,15 +15,9 @@ Discourse::Application.routes.append do
         format: :json,
       }
 
-  put "/admin/plugins/tag-visible-names/tags/:id" =>
+  put "/admin/plugins/tag-visible-names/tags" =>
         "discourse_tag_visible_name/admin/tags#update",
       defaults: {
         format: :json,
       }
-
-  post "/admin/plugins/tag-visible-names/import" =>
-         "discourse_tag_visible_name/admin/tags#import",
-       defaults: {
-         format: :json,
-       }
 end

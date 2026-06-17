@@ -7,69 +7,101 @@ import { ajax } from "discourse/lib/ajax";
 import { i18n } from "discourse-i18n";
 
 export default class TagVisibleNameAdmin extends Component {
+  @tracked dirty = false;
   @tracked filter = "";
-  @tracked importContent = "";
-  @tracked importError = null;
-  @tracked importFormat = "yaml";
-  @tracked importResult = null;
-  @tracked importing = false;
-  @tracked loading = true;
   @tracked loadError = null;
-  @tracked tags = [];
+  @tracked loading = true;
+  @tracked saveError = null;
+  @tracked saveMessage = null;
+  @tracked saving = false;
+  @tracked styles = [];
+  @tracked tagGroups = [];
+  @tracked ungroupedTags = [];
 
   constructor() {
     super(...arguments);
     this.load();
   }
 
-  get filteredTags() {
-    const query = this.filter.trim().toLowerCase();
+  get allTags() {
+    return [
+      ...this.tagGroups.flatMap((group) => group.tags),
+      ...this.ungroupedTags,
+    ];
+  }
+
+  get filteredTagGroups() {
+    const query = this.normalizedFilter;
+
+    return this.tagGroups
+      .map((group) => {
+        if (!query || group.name.toLowerCase().includes(query)) {
+          return group;
+        }
+
+        return {
+          ...group,
+          tags: group.tags.filter((tag) => this.tagMatches(tag, query)),
+        };
+      })
+      .filter((group) => group.tags.length > 0);
+  }
+
+  get filteredUngroupedTags() {
+    const query = this.normalizedFilter;
 
     if (!query) {
-      return this.tags;
+      return this.ungroupedTags;
     }
 
-    return this.tags.filter((tag) => {
-      return (
-        tag.name.toLowerCase().includes(query) ||
-        tag.draftVisibleName.toLowerCase().includes(query)
-      );
-    });
+    return this.ungroupedTags.filter((tag) => this.tagMatches(tag, query));
   }
 
-  get importDisabled() {
-    return this.importing || this.importContent.trim().length === 0;
+  get hasUngroupedTags() {
+    return this.filteredUngroupedTags.length > 0;
   }
 
-  get hasSkippedImports() {
-    return this.importResult?.skipped?.length > 0;
+  get normalizedFilter() {
+    return this.filter.trim().toLowerCase();
   }
 
-  get importedCount() {
-    return this.importResult?.imported?.length || 0;
-  }
-
-  get skippedCount() {
-    return this.importResult?.skipped?.length || 0;
-  }
-
-  get skippedTagNames() {
-    return this.importResult?.skipped?.join(", ") || "";
+  get saveDisabled() {
+    return this.saving || !this.dirty;
   }
 
   buildTag(tag) {
     return {
       ...tag,
+      draftStyle: tag.style || "inherit",
       draftVisibleName: tag.visible_name || "",
-      dirty: false,
-      saving: false,
-      saveDisabled: true,
       error: null,
     };
   }
 
-  updateSaveState(tag) {
-    tag.saveDisabled = tag.saving || !tag.dirty;
+  buildGroup(group) {
+    return {
+      ...group,
+      draftStyle: group.style || "default",
+      tags: group.tags.map((tag) => this.buildTag(tag)),
+    };
+  }
+
+  tagMatches(tag, query) {
+    return (
+      tag.name.toLowerCase().includes(query) ||
+      tag.draftVisibleName.toLowerCase().includes(query)
+    );
+  }
+
+  applyPayload(data) {
+    this.styles = data.styles || [];
+    this.tagGroups = (data.tag_groups || []).map((group) =>
+      this.buildGroup(group)
+    );
+    this.ungroupedTags = (data.ungrouped_tags || []).map((tag) =>
+      this.buildTag(tag)
+    );
+    this.dirty = false;
   }
 
   async load() {
@@ -77,13 +109,23 @@ export default class TagVisibleNameAdmin extends Component {
     this.loadError = null;
 
     try {
-      const data = await ajax("/admin/plugins/tag-visible-names/tags");
-      this.tags = data.tags.map((tag) => this.buildTag(tag));
+      this.applyPayload(await ajax("/admin/plugins/tag-visible-names/tags"));
     } catch {
       this.loadError = i18n("tag_visible_name.admin.load_error");
     } finally {
       this.loading = false;
     }
+  }
+
+  markDirty() {
+    this.dirty = true;
+    this.saveError = null;
+    this.saveMessage = null;
+  }
+
+  refreshCollections() {
+    this.tagGroups = [...this.tagGroups];
+    this.ungroupedTags = [...this.ungroupedTags];
   }
 
   @action
@@ -92,80 +134,66 @@ export default class TagVisibleNameAdmin extends Component {
   }
 
   @action
-  updateImportContent(event) {
-    this.importContent = event.target.value;
-    this.importError = null;
-    this.importResult = null;
+  updateGroupStyle(group, event) {
+    const targetGroup =
+      this.tagGroups.find((item) => item.id === group.id) || group;
+
+    targetGroup.draftStyle = event.target.value;
+    this.markDirty();
+    this.tagGroups = [...this.tagGroups];
   }
 
   @action
-  updateImportFormat(event) {
-    this.importFormat = event.target.value;
-    this.importError = null;
-    this.importResult = null;
+  updateTagStyle(tag, event) {
+    tag.draftStyle = event.target.value;
+    tag.error = null;
+    this.markDirty();
+    this.refreshCollections();
   }
 
   @action
   updateVisibleName(tag, event) {
     tag.draftVisibleName = event.target.value;
-    tag.dirty = tag.draftVisibleName.trim() !== (tag.visible_name || "");
     tag.error = null;
-    this.updateSaveState(tag);
-    this.tags = [...this.tags];
+    this.markDirty();
+    this.refreshCollections();
   }
 
   @action
-  async save(tag) {
-    tag.saving = true;
-    tag.error = null;
-    this.updateSaveState(tag);
-    this.tags = [...this.tags];
+  async saveChanges() {
+    this.saving = true;
+    this.saveError = null;
+    this.saveMessage = null;
+
+    const tagGroupStyles = {};
+    this.tagGroups.forEach((group) => {
+      tagGroupStyles[group.id] = group.draftStyle;
+    });
+
+    const tagStyles = {};
+    this.allTags.forEach((tag) => {
+      tagStyles[tag.name] = tag.draftStyle;
+    });
 
     try {
-      const data = await ajax(`/admin/plugins/tag-visible-names/tags/${tag.id}`, {
+      const data = await ajax("/admin/plugins/tag-visible-names/tags", {
         type: "PUT",
         data: {
-          visible_name: tag.draftVisibleName,
+          tag_group_styles: tagGroupStyles,
+          tag_styles: tagStyles,
+          tags: this.allTags.map((tag) => ({
+            id: tag.id,
+            visible_name: tag.draftVisibleName,
+          })),
         },
       });
 
-      tag.visible_name = data.tag.visible_name || "";
-      tag.draftVisibleName = tag.visible_name;
-      tag.dirty = false;
+      this.applyPayload(data);
+      this.saveMessage = i18n("tag_visible_name.admin.save_success");
     } catch {
-      tag.error = i18n("tag_visible_name.admin.save_error");
+      this.saveError = i18n("tag_visible_name.admin.save_error");
     } finally {
-      tag.saving = false;
-      this.updateSaveState(tag);
-      this.tags = [...this.tags];
-    }
-  }
-
-  @action
-  async importMapping() {
-    this.importing = true;
-    this.importError = null;
-    this.importResult = null;
-
-    try {
-      const result = await ajax("/admin/plugins/tag-visible-names/import", {
-        type: "POST",
-        data: {
-          content: this.importContent,
-          format: this.importFormat,
-        },
-      });
-
-      this.importResult = result;
-      this.importContent = "";
-      await this.load();
-    } catch (error) {
-      this.importError =
-        error?.jqXHR?.responseJSON?.error ||
-        error?.payload?.error ||
-        i18n("tag_visible_name.admin.import_error");
-    } finally {
-      this.importing = false;
+      this.saving = false;
     }
   }
 
@@ -185,115 +213,145 @@ export default class TagVisibleNameAdmin extends Component {
         />
       </div>
 
-      <div class="tag-visible-name-admin__import">
-        <div class="tag-visible-name-admin__import-header">
-          <div>
-            <h3>{{i18n "tag_visible_name.admin.import_title"}}</h3>
-            <p>{{i18n "tag_visible_name.admin.import_description"}}</p>
-          </div>
-
-          <select
-            value={{this.importFormat}}
-            {{on "change" this.updateImportFormat}}
-          >
-            <option value="yaml">YAML</option>
-            <option value="json">JSON</option>
-          </select>
-        </div>
-
-        <textarea
-          value={{this.importContent}}
-          placeholder={{i18n "tag_visible_name.admin.import_placeholder"}}
-          rows="7"
-          {{on "input" this.updateImportContent}}
-        ></textarea>
-
-        <div class="tag-visible-name-admin__import-actions">
-          <button
-            type="button"
-            class="btn btn-primary"
-            disabled={{this.importDisabled}}
-            {{on "click" this.importMapping}}
-          >
-            {{#if this.importing}}
-              {{i18n "tag_visible_name.admin.importing"}}
-            {{else}}
-              {{i18n "tag_visible_name.admin.import"}}
-            {{/if}}
-          </button>
-
-          {{#if this.importResult}}
-            <span class="tag-visible-name-admin__import-result">
-              {{i18n
-                "tag_visible_name.admin.import_result"
-                imported=this.importedCount
-                skipped=this.skippedCount
-              }}
-            </span>
-          {{/if}}
-        </div>
-
-        {{#if this.importError}}
-          <div class="alert alert-error">{{this.importError}}</div>
-        {{/if}}
-
-        {{#if this.hasSkippedImports}}
-          <details class="tag-visible-name-admin__skipped">
-            <summary>{{i18n "tag_visible_name.admin.import_skipped"}}</summary>
-            <code>{{this.skippedTagNames}}</code>
-          </details>
-        {{/if}}
-      </div>
-
       {{#if this.loading}}
         <p>{{i18n "tag_visible_name.admin.loading"}}</p>
       {{else if this.loadError}}
         <div class="alert alert-error">{{this.loadError}}</div>
       {{else}}
-        <table class="tag-visible-name-admin__table">
-          <thead>
-            <tr>
-              <th>{{i18n "tag_visible_name.admin.slug"}}</th>
-              <th>{{i18n "tag_visible_name.admin.visible_name"}}</th>
-              <th>{{i18n "tag_visible_name.admin.topic_count"}}</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {{#each this.filteredTags as |tag|}}
-              <tr>
-                <td>
-                  <code>{{tag.name}}</code>
-                </td>
-                <td>
-                  <input
-                    value={{tag.draftVisibleName}}
-                    placeholder={{tag.name}}
-                    {{on "input" (fn this.updateVisibleName tag)}}
-                  />
-                  {{#if tag.error}}
-                    <div class="tag-visible-name-admin__error">{{tag.error}}</div>
-                  {{/if}}
-                </td>
-                <td>{{tag.topic_count}}</td>
-                <td>
-                  <button
-                    type="button"
-                    class="btn btn-primary"
-                    disabled={{tag.saveDisabled}}
-                    {{on "click" (fn this.save tag)}}
-                  >
-                    {{#if tag.saving}}
-                      {{i18n "tag_visible_name.admin.saving"}}
-                    {{else}}
-                      {{i18n "tag_visible_name.admin.save"}}
-                    {{/if}}
-                  </button>
-                </td>
-              </tr>
-            {{/each}}
-          </tbody>
-        </table>
+        {{#each this.filteredTagGroups as |group|}}
+          <section class="tag-visible-name-admin__group">
+            <div class="tag-visible-name-admin__group-header">
+              <h3>{{group.name}}</h3>
+
+              <label>
+                <span>{{i18n "tag_visible_name.admin.group_style"}}</span>
+                <select
+                  value={{group.draftStyle}}
+                  {{on "change" (fn this.updateGroupStyle group)}}
+                >
+                  {{#each this.styles as |style|}}
+                    <option value={{style.id}}>{{i18n style.name}}</option>
+                  {{/each}}
+                </select>
+              </label>
+            </div>
+
+            <table class="tag-visible-name-admin__table">
+              <thead>
+                <tr>
+                  <th>{{i18n "tag_visible_name.admin.slug"}}</th>
+                  <th>{{i18n "tag_visible_name.admin.visible_name"}}</th>
+                  <th>{{i18n "tag_visible_name.admin.style"}}</th>
+                  <th>{{i18n "tag_visible_name.admin.topic_count"}}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {{#each group.tags as |tag|}}
+                  <tr>
+                    <td>
+                      <code>{{tag.name}}</code>
+                    </td>
+                    <td>
+                      <input
+                        value={{tag.draftVisibleName}}
+                        placeholder={{tag.name}}
+                        {{on "input" (fn this.updateVisibleName tag)}}
+                      />
+                    </td>
+                    <td>
+                      <select
+                        value={{tag.draftStyle}}
+                        {{on "change" (fn this.updateTagStyle tag)}}
+                      >
+                        <option value="inherit">
+                          {{i18n "tag_visible_name.admin.styles.inherit"}}
+                        </option>
+                        {{#each this.styles as |style|}}
+                          <option value={{style.id}}>{{i18n style.name}}</option>
+                        {{/each}}
+                      </select>
+                    </td>
+                    <td>{{tag.topic_count}}</td>
+                  </tr>
+                {{/each}}
+              </tbody>
+            </table>
+          </section>
+        {{/each}}
+
+        {{#if this.hasUngroupedTags}}
+          <section class="tag-visible-name-admin__group">
+            <div class="tag-visible-name-admin__group-header">
+              <h3>{{i18n "tag_visible_name.admin.ungrouped"}}</h3>
+            </div>
+
+            <table class="tag-visible-name-admin__table">
+              <thead>
+                <tr>
+                  <th>{{i18n "tag_visible_name.admin.slug"}}</th>
+                  <th>{{i18n "tag_visible_name.admin.visible_name"}}</th>
+                  <th>{{i18n "tag_visible_name.admin.style"}}</th>
+                  <th>{{i18n "tag_visible_name.admin.topic_count"}}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {{#each this.filteredUngroupedTags as |tag|}}
+                  <tr>
+                    <td>
+                      <code>{{tag.name}}</code>
+                    </td>
+                    <td>
+                      <input
+                        value={{tag.draftVisibleName}}
+                        placeholder={{tag.name}}
+                        {{on "input" (fn this.updateVisibleName tag)}}
+                      />
+                    </td>
+                    <td>
+                      <select
+                        value={{tag.draftStyle}}
+                        {{on "change" (fn this.updateTagStyle tag)}}
+                      >
+                        <option value="inherit">
+                          {{i18n "tag_visible_name.admin.styles.inherit"}}
+                        </option>
+                        {{#each this.styles as |style|}}
+                          <option value={{style.id}}>{{i18n style.name}}</option>
+                        {{/each}}
+                      </select>
+                    </td>
+                    <td>{{tag.topic_count}}</td>
+                  </tr>
+                {{/each}}
+              </tbody>
+            </table>
+          </section>
+        {{/if}}
+
+        <div class="tag-visible-name-admin__footer">
+          <button
+            type="button"
+            class="btn btn-primary"
+            disabled={{this.saveDisabled}}
+            {{on "click" this.saveChanges}}
+          >
+            {{#if this.saving}}
+              {{i18n "tag_visible_name.admin.saving"}}
+            {{else}}
+              {{i18n "tag_visible_name.admin.save_all"}}
+            {{/if}}
+          </button>
+
+          {{#if this.saveMessage}}
+            <span class="tag-visible-name-admin__save-message">
+              {{this.saveMessage}}
+            </span>
+          {{/if}}
+        </div>
+
+        {{#if this.saveError}}
+          <div class="alert alert-error">{{this.saveError}}</div>
+        {{/if}}
       {{/if}}
     </section>
   </template>

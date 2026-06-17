@@ -7,6 +7,8 @@ module ::DiscourseTagVisibleName
     def index
       render json: {
                tag_visible_names: ::DiscourseTagVisibleName::TagVisibleNameStore.mapping,
+               tag_styles:
+                 ::DiscourseTagVisibleName::TagVisibleNameStore.public_style_mapping,
              }
     end
   end

@@ -13,47 +13,41 @@
     width: min(320px, 100%);
   }
 
-  &__import {
+  &__group {
     margin-bottom: 1.5rem;
     padding: 1rem;
     border: 1px solid var(--primary-low);
     border-radius: 4px;
-
-    textarea {
-      width: 100%;
-      margin-bottom: 0.75rem;
-      font-family: var(--d-font-family--monospace, monospace);
-    }
   }
 
-  &__import-header,
-  &__import-actions {
+  &__group-header,
+  &__footer {
     display: flex;
     gap: 1rem;
-    align-items: flex-start;
+    align-items: center;
     justify-content: space-between;
     margin-bottom: 0.75rem;
-  }
 
-  &__import-actions {
-    align-items: center;
-    justify-content: flex-start;
-  }
-
-  &__import-result,
-  &__skipped {
-    color: var(--primary-medium);
-    font-size: var(--font-down-1);
-  }
-
-  &__skipped {
-    margin-top: 0.75rem;
-
-    code {
-      display: block;
-      margin-top: 0.5rem;
-      white-space: normal;
+    h3 {
+      margin: 0;
     }
+
+    label {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+      margin: 0;
+    }
+  }
+
+  &__footer {
+    justify-content: flex-start;
+    margin-top: 1rem;
+  }
+
+  &__save-message {
+    color: var(--success);
+    font-size: var(--font-down-1);
   }
 
   &__table {
@@ -67,11 +61,61 @@
     input {
       width: 100%;
     }
+
+    select {
+      width: 100%;
+    }
   }
 
   &__error {
     margin-top: 0.25rem;
     color: var(--danger);
     font-size: var(--font-down-1);
+  }
+}
+
+.discourse-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  align-items: center;
+}
+
+.extra-info-wrapper .topic-header-extra .discourse-tags {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: var(--space-1);
+}
+
+.discourse-tags__tag-separator {
+  display: none;
+}
+
+a.discourse-tag {
+  margin: 2px 2px 0 0 !important;
+  padding: 4px 8px !important;
+  border-radius: 4px !important;
+  min-width: unset !important;
+  display: inline-block !important;
+  max-width: 240px !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  vertical-align: middle;
+
+  &.tag-visible-name-style--area {
+    order: -10 !important;
+    border: none !important;
+    background-color: #ffb900 !important;
+    color: #000 !important;
+
+    &:hover {
+      background-color: var(--primary-low-mid) !important;
+    }
+  }
+
+  &.tag-visible-name-style--section {
+    width: auto !important;
+    color: var(--primary) !important;
   }
 }

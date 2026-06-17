@@ -6,14 +6,18 @@ RSpec.describe "Tag visible names admin API" do
   fab!(:admin)
   fab!(:user)
   fab!(:tag) { Fabricate(:tag, name: "бгу") }
+  fab!(:ungrouped_tag) { Fabricate(:tag, name: "без-группы") }
+  fab!(:tag_group) { Fabricate(:tag_group, name: "Участки", tag_names: [tag.name]) }
 
   before do
     SiteSetting.tag_visible_name_enabled = true
 
     if ::Tag.column_names.include?("topic_count")
       tag.update_column(:topic_count, 2)
+      ungrouped_tag.update_column(:topic_count, 1)
     elsif ::Tag.column_names.include?("public_topic_count")
       tag.update_column(:public_topic_count, 2)
+      ungrouped_tag.update_column(:public_topic_count, 1)
     end
   end
 
@@ -32,7 +36,7 @@ RSpec.describe "Tag visible names admin API" do
       expect(response.status).to eq(403)
     end
 
-    it "returns tags for admins" do
+    it "returns grouped tags for admins" do
       sign_in(admin)
       ::DiscourseTagVisibleName::TagVisibleNameStore.save!(tag, "БГУ")
 
@@ -41,53 +45,35 @@ RSpec.describe "Tag visible names admin API" do
       expect(response.status).to eq(200)
 
       payload = response.parsed_body
-      expect(payload["tags"]).to include(
+      group = payload["tag_groups"].find { |item| item["id"] == tag_group.id }
+
+      expect(payload["styles"]).to include(
+        hash_including("id" => "default"),
+        hash_including("id" => "area"),
+        hash_including("id" => "section"),
+      )
+      expect(group).to include("name" => "Участки", "style" => "default")
+      expect(group["tags"]).to include(
         hash_including(
           "id" => tag.id,
           "name" => "бгу",
           "visible_name" => "БГУ",
           "topic_count" => 2,
+          "effective_style" => "default",
         ),
+      )
+      expect(payload["ungrouped_tags"]).to include(
+        hash_including("id" => ungrouped_tag.id, "name" => "без-группы"),
       )
     end
   end
 
-  describe "PUT /admin/plugins/tag-visible-names/tags/:id" do
-    it "saves a visible name" do
-      sign_in(admin)
-
-      put "/admin/plugins/tag-visible-names/tags/#{tag.id}.json",
-          params: {
-            visible_name: " БГУ ",
-          }
-
-      expect(response.status).to eq(200)
-      expect(response.parsed_body.dig("tag", "visible_name")).to eq("БГУ")
-      expect(::DiscourseTagVisibleName::TagVisibleNameStore.visible_name_for(tag)).to eq("БГУ")
-    end
-
-    it "removes a visible name when value is blank" do
-      sign_in(admin)
-      ::DiscourseTagVisibleName::TagVisibleNameStore.save!(tag, "БГУ")
-
-      put "/admin/plugins/tag-visible-names/tags/#{tag.id}.json",
-          params: {
-            visible_name: " ",
-          }
-
-      expect(response.status).to eq(200)
-      expect(response.parsed_body.dig("tag", "visible_name")).to be_nil
-      expect(::DiscourseTagVisibleName::TagVisibleNameStore.visible_name_for(tag)).to be_nil
-    end
-  end
-
-  describe "POST /admin/plugins/tag-visible-names/import" do
+  describe "PUT /admin/plugins/tag-visible-names/tags" do
     it "rejects anonymous users" do
-      post "/admin/plugins/tag-visible-names/import.json",
-           params: {
-             format: "yaml",
-             content: "бгу: БГУ",
-           }
+      put "/admin/plugins/tag-visible-names/tags.json",
+          params: {
+            tags: [{ id: tag.id, visible_name: "БГУ" }],
+          }
 
       expect(response.status).to eq(403)
     end
@@ -95,70 +81,42 @@ RSpec.describe "Tag visible names admin API" do
     it "rejects regular users" do
       sign_in(user)
 
-      post "/admin/plugins/tag-visible-names/import.json",
-           params: {
-             format: "yaml",
-             content: "бгу: БГУ",
-           }
+      put "/admin/plugins/tag-visible-names/tags.json",
+          params: {
+            tags: [{ id: tag.id, visible_name: "БГУ" }],
+          }
 
       expect(response.status).to eq(403)
     end
 
-    it "imports YAML mappings for admins" do
+    it "saves visible names and styles in bulk" do
       sign_in(admin)
 
-      post "/admin/plugins/tag-visible-names/import.json",
-           params: {
-             format: "yaml",
-             content: "бгу: БГУ\nнет-такого-тега: Нет такого тега",
-           }
+      put "/admin/plugins/tag-visible-names/tags.json",
+          params: {
+            tag_group_styles: {
+              tag_group.id => "area",
+            },
+            tag_styles: {
+              tag.name => "section",
+              ungrouped_tag.name => "area",
+            },
+            tags: [
+              { id: tag.id, visible_name: " БГУ " },
+              { id: ungrouped_tag.id, visible_name: " " },
+            ],
+          }
 
       expect(response.status).to eq(200)
-      expect(response.parsed_body["imported"]).to eq(["бгу"])
-      expect(response.parsed_body["skipped"]).to eq(["нет-такого-тега"])
       expect(::DiscourseTagVisibleName::TagVisibleNameStore.visible_name_for(tag)).to eq("БГУ")
-    end
+      expect(::DiscourseTagVisibleName::TagVisibleNameStore.visible_name_for(ungrouped_tag)).to be_nil
 
-    it "imports JSON mappings for admins" do
-      sign_in(admin)
-
-      post "/admin/plugins/tag-visible-names/import.json",
-           params: {
-             format: "json",
-             content: { "бгу" => " БГУ " }.to_json,
-           }
-
-      expect(response.status).to eq(200)
-      expect(response.parsed_body["imported"]).to eq(["бгу"])
-      expect(response.parsed_body["skipped"]).to eq([])
-      expect(::DiscourseTagVisibleName::TagVisibleNameStore.visible_name_for(tag)).to eq("БГУ")
-    end
-
-    it "removes a visible name when imported value is blank" do
-      sign_in(admin)
-      ::DiscourseTagVisibleName::TagVisibleNameStore.save!(tag, "БГУ")
-
-      post "/admin/plugins/tag-visible-names/import.json",
-           params: {
-             format: "yaml",
-             content: "бгу: \"\"",
-           }
-
-      expect(response.status).to eq(200)
-      expect(::DiscourseTagVisibleName::TagVisibleNameStore.visible_name_for(tag)).to be_nil
-    end
-
-    it "returns 422 for invalid payloads" do
-      sign_in(admin)
-
-      post "/admin/plugins/tag-visible-names/import.json",
-           params: {
-             format: "json",
-             content: "[\"бгу\"]",
-           }
-
-      expect(response.status).to eq(422)
-      expect(response.parsed_body["error"]).to be_present
+      styles = ::DiscourseTagVisibleName::TagVisibleNameStore.style_mapping
+      expect(styles["tag_group_styles"]).to include(tag_group.id.to_s => "area")
+      expect(styles["tag_styles"]).to include(
+        tag.name => "section",
+        ungrouped_tag.name => "area",
+      )
     end
   end
 end
