@@ -80,4 +80,85 @@ RSpec.describe "Tag visible names admin API" do
       expect(::DiscourseTagVisibleName::TagVisibleNameStore.visible_name_for(tag)).to be_nil
     end
   end
+
+  describe "POST /admin/plugins/tag-visible-names/import" do
+    it "rejects anonymous users" do
+      post "/admin/plugins/tag-visible-names/import.json",
+           params: {
+             format: "yaml",
+             content: "бгу: БГУ",
+           }
+
+      expect(response.status).to eq(403)
+    end
+
+    it "rejects regular users" do
+      sign_in(user)
+
+      post "/admin/plugins/tag-visible-names/import.json",
+           params: {
+             format: "yaml",
+             content: "бгу: БГУ",
+           }
+
+      expect(response.status).to eq(403)
+    end
+
+    it "imports YAML mappings for admins" do
+      sign_in(admin)
+
+      post "/admin/plugins/tag-visible-names/import.json",
+           params: {
+             format: "yaml",
+             content: "бгу: БГУ\nнет-такого-тега: Нет такого тега",
+           }
+
+      expect(response.status).to eq(200)
+      expect(response.parsed_body["imported"]).to eq(["бгу"])
+      expect(response.parsed_body["skipped"]).to eq(["нет-такого-тега"])
+      expect(::DiscourseTagVisibleName::TagVisibleNameStore.visible_name_for(tag)).to eq("БГУ")
+    end
+
+    it "imports JSON mappings for admins" do
+      sign_in(admin)
+
+      post "/admin/plugins/tag-visible-names/import.json",
+           params: {
+             format: "json",
+             content: { "бгу" => " БГУ " }.to_json,
+           }
+
+      expect(response.status).to eq(200)
+      expect(response.parsed_body["imported"]).to eq(["бгу"])
+      expect(response.parsed_body["skipped"]).to eq([])
+      expect(::DiscourseTagVisibleName::TagVisibleNameStore.visible_name_for(tag)).to eq("БГУ")
+    end
+
+    it "removes a visible name when imported value is blank" do
+      sign_in(admin)
+      ::DiscourseTagVisibleName::TagVisibleNameStore.save!(tag, "БГУ")
+
+      post "/admin/plugins/tag-visible-names/import.json",
+           params: {
+             format: "yaml",
+             content: "бгу: \"\"",
+           }
+
+      expect(response.status).to eq(200)
+      expect(::DiscourseTagVisibleName::TagVisibleNameStore.visible_name_for(tag)).to be_nil
+    end
+
+    it "returns 422 for invalid payloads" do
+      sign_in(admin)
+
+      post "/admin/plugins/tag-visible-names/import.json",
+           params: {
+             format: "json",
+             content: "[\"бгу\"]",
+           }
+
+      expect(response.status).to eq(422)
+      expect(response.parsed_body["error"]).to be_present
+    end
+  end
 end

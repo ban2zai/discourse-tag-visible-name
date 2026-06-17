@@ -37,4 +37,30 @@ RSpec.describe ::DiscourseTagVisibleName::TagVisibleNameStore do
       expect(described_class.mapping).to eq("бгу" => "БГУ")
     end
   end
+
+  describe ".parse_mapping" do
+    it "parses YAML objects" do
+      expect(described_class.parse_mapping("бгу: БГУ", "yaml")).to eq(
+        "бгу" => "БГУ",
+      )
+    end
+
+    it "parses JSON objects" do
+      expect(described_class.parse_mapping({ "бгу" => "БГУ" }.to_json, "json")).to eq(
+        "бгу" => "БГУ",
+      )
+    end
+
+    it "rejects non-object payloads" do
+      expect { described_class.parse_mapping(["бгу"].to_json, "json") }.to raise_error(
+        ArgumentError,
+      )
+    end
+
+    it "rejects unknown formats" do
+      expect { described_class.parse_mapping("бгу: БГУ", "txt") }.to raise_error(
+        ArgumentError,
+      )
+    end
+  end
 end

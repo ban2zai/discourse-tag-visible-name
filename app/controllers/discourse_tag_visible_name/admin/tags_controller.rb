@@ -32,6 +32,21 @@ module ::DiscourseTagVisibleName
                }
       end
 
+      def import
+        mapping =
+          ::DiscourseTagVisibleName::TagVisibleNameStore.parse_mapping(
+            params[:content],
+            params[:format],
+          )
+
+        render json:
+                 ::DiscourseTagVisibleName::TagVisibleNameStore.import_mapping!(
+                   mapping,
+                 )
+      rescue ArgumentError, JSON::ParserError, Psych::Exception => e
+        render json: { error: e.message }, status: 422
+      end
+
       private
 
       def ensure_site_admin

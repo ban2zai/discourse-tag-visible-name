@@ -69,6 +69,25 @@ module ::DiscourseTagVisibleName
         import_mapping!(mapping)
       end
 
+      def parse_mapping(content, format)
+        data =
+          case format.to_s.downcase
+          when "json"
+            JSON.parse(content.to_s)
+          when "yaml", "yml"
+            YAML.safe_load(content.to_s, aliases: false)
+          else
+            raise ArgumentError, "Неизвестный формат импорта: #{format}"
+          end
+
+        if !data.is_a?(Hash)
+          raise ArgumentError,
+                "Файл импорта должен содержать объект slug: visible_name"
+        end
+
+        data
+      end
+
       def import_mapping!(mapping)
         imported = []
         skipped = []
@@ -118,16 +137,10 @@ module ::DiscourseTagVisibleName
         raise ArgumentError, "Файл импорта не найден: #{path}" if !File.exist?(path)
 
         content = File.read(path)
-        data =
-          if File.extname(path).downcase == ".json"
-            JSON.parse(content)
-          else
-            YAML.safe_load(content, aliases: false)
-          end
+        format = File.extname(path).downcase.delete_prefix(".")
+        format = "yaml" if format.blank?
 
-        raise ArgumentError, "Файл импорта должен содержать объект slug: visible_name" if !data.is_a?(Hash)
-
-        data
+        parse_mapping(content, format)
       end
     end
   end

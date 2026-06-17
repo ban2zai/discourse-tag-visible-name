@@ -8,6 +8,11 @@ import { i18n } from "discourse-i18n";
 
 export default class TagVisibleNameAdmin extends Component {
   @tracked filter = "";
+  @tracked importContent = "";
+  @tracked importError = null;
+  @tracked importFormat = "yaml";
+  @tracked importResult = null;
+  @tracked importing = false;
   @tracked loading = true;
   @tracked loadError = null;
   @tracked tags = [];
@@ -30,6 +35,26 @@ export default class TagVisibleNameAdmin extends Component {
         tag.draftVisibleName.toLowerCase().includes(query)
       );
     });
+  }
+
+  get importDisabled() {
+    return this.importing || this.importContent.trim().length === 0;
+  }
+
+  get hasSkippedImports() {
+    return this.importResult?.skipped?.length > 0;
+  }
+
+  get importedCount() {
+    return this.importResult?.imported?.length || 0;
+  }
+
+  get skippedCount() {
+    return this.importResult?.skipped?.length || 0;
+  }
+
+  get skippedTagNames() {
+    return this.importResult?.skipped?.join(", ") || "";
   }
 
   buildTag(tag) {
@@ -64,6 +89,20 @@ export default class TagVisibleNameAdmin extends Component {
   @action
   updateFilter(event) {
     this.filter = event.target.value;
+  }
+
+  @action
+  updateImportContent(event) {
+    this.importContent = event.target.value;
+    this.importError = null;
+    this.importResult = null;
+  }
+
+  @action
+  updateImportFormat(event) {
+    this.importFormat = event.target.value;
+    this.importError = null;
+    this.importResult = null;
   }
 
   @action
@@ -102,6 +141,34 @@ export default class TagVisibleNameAdmin extends Component {
     }
   }
 
+  @action
+  async importMapping() {
+    this.importing = true;
+    this.importError = null;
+    this.importResult = null;
+
+    try {
+      const result = await ajax("/admin/plugins/tag-visible-names/import", {
+        type: "POST",
+        data: {
+          content: this.importContent,
+          format: this.importFormat,
+        },
+      });
+
+      this.importResult = result;
+      this.importContent = "";
+      await this.load();
+    } catch (error) {
+      this.importError =
+        error?.jqXHR?.responseJSON?.error ||
+        error?.payload?.error ||
+        i18n("tag_visible_name.admin.import_error");
+    } finally {
+      this.importing = false;
+    }
+  }
+
   <template>
     <section class="tag-visible-name-admin">
       <div class="tag-visible-name-admin__header">
@@ -116,6 +183,66 @@ export default class TagVisibleNameAdmin extends Component {
           placeholder={{i18n "tag_visible_name.admin.search_placeholder"}}
           {{on "input" this.updateFilter}}
         />
+      </div>
+
+      <div class="tag-visible-name-admin__import">
+        <div class="tag-visible-name-admin__import-header">
+          <div>
+            <h3>{{i18n "tag_visible_name.admin.import_title"}}</h3>
+            <p>{{i18n "tag_visible_name.admin.import_description"}}</p>
+          </div>
+
+          <select
+            value={{this.importFormat}}
+            {{on "change" this.updateImportFormat}}
+          >
+            <option value="yaml">YAML</option>
+            <option value="json">JSON</option>
+          </select>
+        </div>
+
+        <textarea
+          value={{this.importContent}}
+          placeholder={{i18n "tag_visible_name.admin.import_placeholder"}}
+          rows="7"
+          {{on "input" this.updateImportContent}}
+        ></textarea>
+
+        <div class="tag-visible-name-admin__import-actions">
+          <button
+            type="button"
+            class="btn btn-primary"
+            disabled={{this.importDisabled}}
+            {{on "click" this.importMapping}}
+          >
+            {{#if this.importing}}
+              {{i18n "tag_visible_name.admin.importing"}}
+            {{else}}
+              {{i18n "tag_visible_name.admin.import"}}
+            {{/if}}
+          </button>
+
+          {{#if this.importResult}}
+            <span class="tag-visible-name-admin__import-result">
+              {{i18n
+                "tag_visible_name.admin.import_result"
+                imported=this.importedCount
+                skipped=this.skippedCount
+              }}
+            </span>
+          {{/if}}
+        </div>
+
+        {{#if this.importError}}
+          <div class="alert alert-error">{{this.importError}}</div>
+        {{/if}}
+
+        {{#if this.hasSkippedImports}}
+          <details class="tag-visible-name-admin__skipped">
+            <summary>{{i18n "tag_visible_name.admin.import_skipped"}}</summary>
+            <code>{{this.skippedTagNames}}</code>
+          </details>
+        {{/if}}
       </div>
 
       {{#if this.loading}}
