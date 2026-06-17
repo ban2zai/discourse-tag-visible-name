@@ -2,7 +2,7 @@
 
 Плагин добавляет редактируемые отображаемые имена для тегов Discourse.
 
-Системный slug тега не меняется: URL, `data-tag-name`, tag groups и composer продолжают работать с настоящим именем тега. Пользователи видят значение из custom field тега с ключом `visible_name`.
+Системный slug тега не меняется: URL, `data-tag-name`, tag groups и composer продолжают работать с настоящим именем тега. Плагин хранит mapping `tag_slug -> visible_name` в `PluginStore`.
 
 ## Возможности
 

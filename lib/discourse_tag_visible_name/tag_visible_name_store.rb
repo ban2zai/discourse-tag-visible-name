@@ -5,84 +5,46 @@ require "yaml"
 
 module ::DiscourseTagVisibleName
   class TagVisibleNameStore
+    STORE_KEY = "visible_names"
+
     class << self
       def list
         tags = ::Tag.order(:name).pluck(:id, :name, :topic_count)
-        visible_names = visible_names_by_tag_id(tags.map(&:first))
+        visible_names = mapping
 
         tags.map do |id, name, topic_count|
           {
             id: id,
             name: name,
-            visible_name: visible_names[id],
+            visible_name: visible_names[name],
             topic_count: topic_count || 0,
           }
         end
       end
 
       def mapping
-        rows =
-          ::DB.query_hash(
-            <<~SQL,
-              SELECT tags.name AS tag_name, tag_custom_fields.value
-              FROM tag_custom_fields
-              INNER JOIN tags ON tags.id = tag_custom_fields.tag_id
-              WHERE tag_custom_fields.name = :field_name
-                AND tag_custom_fields.value IS NOT NULL
-                AND tag_custom_fields.value <> ''
-            SQL
-            field_name: ::DiscourseTagVisibleName::CUSTOM_FIELD_NAME,
-          )
-
-        rows.to_h { |row| [row["tag_name"], row["value"]] }
+        raw = ::PluginStore.get(::DiscourseTagVisibleName::PLUGIN_NAME, STORE_KEY)
+        raw.is_a?(Hash) ? raw : {}
       end
 
       def visible_name_for(tag)
         return if tag.blank?
 
-        ::DB
-          .query_single(
-            <<~SQL,
-              SELECT value
-              FROM tag_custom_fields
-              WHERE tag_id = :tag_id
-                AND name = :field_name
-              LIMIT 1
-            SQL
-            tag_id: tag.id,
-            field_name: ::DiscourseTagVisibleName::CUSTOM_FIELD_NAME,
-          )
-          .first
-          .presence
+        mapping[tag.name].presence
       end
 
       def save!(tag, visible_name)
         value = visible_name.to_s.strip
-
-        ::DB.exec(
-          <<~SQL,
-            DELETE FROM tag_custom_fields
-            WHERE tag_id = :tag_id
-              AND name = :field_name
-          SQL
-          tag_id: tag.id,
-          field_name: ::DiscourseTagVisibleName::CUSTOM_FIELD_NAME,
-        )
+        visible_names = mapping.dup
 
         if value.blank?
-          return nil
+          visible_names.delete(tag.name)
+          save_mapping!(visible_names)
+          return
         end
 
-        ::DB.exec(
-          <<~SQL,
-            INSERT INTO tag_custom_fields (tag_id, name, value, created_at, updated_at)
-            VALUES (:tag_id, :field_name, :value, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-          SQL
-          tag_id: tag.id,
-          field_name: ::DiscourseTagVisibleName::CUSTOM_FIELD_NAME,
-          value: value,
-        )
-
+        visible_names[tag.name] = value
+        save_mapping!(visible_names)
         value
       end
 
@@ -111,24 +73,18 @@ module ::DiscourseTagVisibleName
 
       private
 
-      def visible_names_by_tag_id(tag_ids)
-        return {} if tag_ids.blank?
+      def save_mapping!(visible_names)
+        clean_mapping =
+          visible_names.each_with_object({}) do |(name, visible_name), result|
+            value = visible_name.to_s.strip
+            result[name.to_s] = value if value.present?
+          end
 
-        rows =
-          ::DB.query_hash(
-            <<~SQL,
-              SELECT tag_id, value
-              FROM tag_custom_fields
-              WHERE name = :field_name
-                AND tag_id IN (:tag_ids)
-                AND value IS NOT NULL
-                AND value <> ''
-            SQL
-            field_name: ::DiscourseTagVisibleName::CUSTOM_FIELD_NAME,
-            tag_ids: tag_ids,
-          )
-
-        rows.to_h { |row| [row["tag_id"], row["value"]] }
+        ::PluginStore.set(
+          ::DiscourseTagVisibleName::PLUGIN_NAME,
+          STORE_KEY,
+          clean_mapping,
+        )
       end
 
       def read_mapping(path)
