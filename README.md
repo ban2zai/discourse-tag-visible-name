@@ -2,7 +2,7 @@
 
 Плагин добавляет редактируемые отображаемые имена для тегов Discourse.
 
-Системный slug тега не меняется: URL, `data-tag-name`, tag groups и composer продолжают работать с настоящим именем тега. Пользователи видят значение из `TagCustomField` с ключом `visible_name`.
+Системный slug тега не меняется: URL, `data-tag-name`, tag groups и composer продолжают работать с настоящим именем тега. Пользователи видят значение из custom field тега с ключом `visible_name`.
 
 ## Возможности
 
@@ -27,4 +27,3 @@ bundle exec rake tag_visible_names:import[plugins/discourse-tag-visible-name/con
 ```
 
 Неизвестные slug не создаются автоматически, а выводятся как пропущенные.
-

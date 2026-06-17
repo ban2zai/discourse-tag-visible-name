@@ -21,43 +21,39 @@ module ::DiscourseTagVisibleName
       end
 
       def mapping
-        ::TagCustomField
-          .joins("INNER JOIN tags ON tags.id = tag_custom_fields.tag_id")
-          .where(name: ::DiscourseTagVisibleName::CUSTOM_FIELD_NAME)
-          .where.not(value: [nil, ""])
-          .pluck("tags.name", "tag_custom_fields.value")
-          .to_h
+        rows =
+          ::DB.query_hash(
+            <<~SQL,
+              SELECT tags.name AS tag_name, tag_custom_fields.value
+              FROM tag_custom_fields
+              INNER JOIN tags ON tags.id = tag_custom_fields.tag_id
+              WHERE tag_custom_fields.name = :field_name
+                AND tag_custom_fields.value IS NOT NULL
+                AND tag_custom_fields.value <> ''
+            SQL
+            field_name: ::DiscourseTagVisibleName::CUSTOM_FIELD_NAME,
+          )
+
+        rows.to_h { |row| [row["tag_name"], row["value"]] }
       end
 
       def visible_name_for(tag)
         return if tag.blank?
 
-        ::TagCustomField.find_by(
-          tag_id: tag.id,
-          name: ::DiscourseTagVisibleName::CUSTOM_FIELD_NAME,
-        )&.value
+        tag.custom_fields[::DiscourseTagVisibleName::CUSTOM_FIELD_NAME].presence
       end
 
       def save!(tag, visible_name)
         value = visible_name.to_s.strip
 
         if value.blank?
-          ::TagCustomField.where(
-            tag_id: tag.id,
-            name: ::DiscourseTagVisibleName::CUSTOM_FIELD_NAME,
-          ).delete_all
-          tag.custom_fields.delete(::DiscourseTagVisibleName::CUSTOM_FIELD_NAME) if tag.respond_to?(:custom_fields)
+          tag.custom_fields.delete(::DiscourseTagVisibleName::CUSTOM_FIELD_NAME)
+          tag.save_custom_fields
           return nil
         end
 
-        field =
-          ::TagCustomField.find_or_initialize_by(
-            tag_id: tag.id,
-            name: ::DiscourseTagVisibleName::CUSTOM_FIELD_NAME,
-          )
-        field.value = value
-        field.save!
-        tag.custom_fields[::DiscourseTagVisibleName::CUSTOM_FIELD_NAME] = value if tag.respond_to?(:custom_fields)
+        tag.custom_fields[::DiscourseTagVisibleName::CUSTOM_FIELD_NAME] = value
+        tag.save_custom_fields
         value
       end
 
@@ -89,11 +85,21 @@ module ::DiscourseTagVisibleName
       def visible_names_by_tag_id(tag_ids)
         return {} if tag_ids.blank?
 
-        ::TagCustomField
-          .where(tag_id: tag_ids, name: ::DiscourseTagVisibleName::CUSTOM_FIELD_NAME)
-          .where.not(value: [nil, ""])
-          .pluck(:tag_id, :value)
-          .to_h
+        rows =
+          ::DB.query_hash(
+            <<~SQL,
+              SELECT tag_id, value
+              FROM tag_custom_fields
+              WHERE name = :field_name
+                AND tag_id IN (:tag_ids)
+                AND value IS NOT NULL
+                AND value <> ''
+            SQL
+            field_name: ::DiscourseTagVisibleName::CUSTOM_FIELD_NAME,
+            tag_ids: tag_ids,
+          )
+
+        rows.to_h { |row| [row["tag_id"], row["value"]] }
       end
 
       def read_mapping(path)
