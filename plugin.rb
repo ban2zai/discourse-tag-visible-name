@@ -23,36 +23,31 @@ module ::DiscourseTagVisibleName
     end
   end
 
-  def self.cached_visible_names
-    ::RequestStore.store[:tag_visible_name_visible_names] ||=
-      ::DiscourseTagVisibleName::TagVisibleNameStore.mapping
-  end
-
-  def self.cached_tag_styles
-    ::RequestStore.store[:tag_visible_name_tag_styles] ||=
-      ::DiscourseTagVisibleName::TagVisibleNameStore.public_style_mapping
-  end
-
-  def self.visible_tag_fields(name)
+  def self.visible_tag_fields(name, visible_names:, tag_styles:)
     {
       visible_name:
         ::DiscourseTagVisibleName::TagVisibleNameStore.visible_name_for_name(
           name,
-          cached_visible_names,
+          visible_names,
         ),
       visible_style:
         ::DiscourseTagVisibleName::TagVisibleNameStore.visible_style_for_name(
           name,
-          cached_tag_styles,
+          tag_styles,
         ),
     }
   end
 
-  def self.add_visible_fields_to_tag_payload(tag_payload)
+  def self.add_visible_fields_to_tag_payload(tag_payload, visible_names:, tag_styles:)
     tag_name = serializer_tag_name(tag_payload)
     return tag_payload if tag_name.blank?
 
-    visible_fields = visible_tag_fields(tag_name)
+    visible_fields =
+      visible_tag_fields(
+        tag_name,
+        visible_names: visible_names,
+        tag_styles: tag_styles,
+      )
 
     if tag_payload.respond_to?(:merge)
       tag_payload.merge(visible_fields.stringify_keys)

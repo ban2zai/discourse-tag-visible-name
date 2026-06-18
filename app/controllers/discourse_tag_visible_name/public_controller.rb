@@ -56,7 +56,11 @@ module ::DiscourseTagVisibleName
           value.transform_values { |item| enrich_tags_payload(item) }
 
         if tag_payload?(enriched)
-          ::DiscourseTagVisibleName.add_visible_fields_to_tag_payload(enriched)
+          ::DiscourseTagVisibleName.add_visible_fields_to_tag_payload(
+            enriched,
+            visible_names: visible_names,
+            tag_styles: tag_styles,
+          )
         else
           enriched
         end
@@ -67,6 +71,16 @@ module ::DiscourseTagVisibleName
 
     def tag_payload?(payload)
       payload.key?("count") && (payload.key?("name") || payload.key?("text"))
+    end
+
+    def visible_names
+      @visible_names ||=
+        ::DiscourseTagVisibleName::TagVisibleNameStore.mapping
+    end
+
+    def tag_styles
+      @tag_styles ||=
+        ::DiscourseTagVisibleName::TagVisibleNameStore.public_style_mapping
     end
   end
 end
