@@ -49,8 +49,6 @@ module ::DiscourseTagVisibleName
   end
 
   def self.add_visible_fields_to_tag_payload(tag_payload)
-    return tag_payload if !SiteSetting.tag_visible_name_enabled
-
     tag_name = serializer_tag_name(tag_payload)
     return tag_payload if tag_name.blank?
 
@@ -66,49 +64,3 @@ end
 
 require_relative "lib/discourse_tag_visible_name/engine"
 require_relative "lib/discourse_tag_visible_name/tag_visible_name_store"
-
-after_initialize do
-  add_to_serializer(:tag, :visible_name, false) do
-    tag_name = ::DiscourseTagVisibleName.serializer_tag_name(object)
-    next if tag_name.blank?
-
-    ::DiscourseTagVisibleName::TagVisibleNameStore.visible_name_for_name(
-      tag_name,
-      ::DiscourseTagVisibleName.cached_visible_names,
-    )
-  end
-
-  add_to_serializer(:tag, :visible_style, false) do
-    tag_name = ::DiscourseTagVisibleName.serializer_tag_name(object)
-    next ::DiscourseTagVisibleName::TagVisibleNameStore::DEFAULT_STYLE if tag_name.blank?
-
-    ::DiscourseTagVisibleName::TagVisibleNameStore.visible_style_for_name(
-      tag_name,
-      ::DiscourseTagVisibleName.cached_tag_styles,
-    )
-  end
-
-  if defined?(TagSerializer)
-    TagSerializer.class_eval do
-      def include_visible_name?
-        SiteSetting.tag_visible_name_enabled
-      end
-
-      def include_visible_style?
-        SiteSetting.tag_visible_name_enabled
-      end
-    end
-  end
-
-  if defined?(TagGroupSerializer)
-    module ::DiscourseTagVisibleName::TagGroupSerializerExtension
-      def tags
-        Array(super).map do |tag_payload|
-          ::DiscourseTagVisibleName.add_visible_fields_to_tag_payload(tag_payload)
-        end
-      end
-    end
-
-    TagGroupSerializer.prepend(::DiscourseTagVisibleName::TagGroupSerializerExtension)
-  end
-end

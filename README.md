@@ -11,6 +11,7 @@
   - `GET /admin/plugins/tag-visible-names/tags`
   - `PUT /admin/plugins/tag-visible-names/tags`
 - Публичный endpoint: `GET /tag-visible-names.json`.
+- Публичная копия `tags.json` с отображаемыми именами и стилями: `GET /tags_mapping_name.json`.
 - Публичная подмена текста тегов `a.discourse-tag[data-tag-name]` и `.discourse-tags .discourse-tag[data-tag-name]`.
 - Импорт YAML/JSON mapping через rake.
 

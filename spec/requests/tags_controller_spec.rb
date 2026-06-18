@@ -2,7 +2,7 @@
 
 require "rails_helper"
 
-RSpec.describe "Tag visible names in tags API" do
+RSpec.describe "Tag visible names tags mapping API" do
   fab!(:tag) { Fabricate(:tag, name: "Техно") }
   fab!(:plain_tag) { Fabricate(:tag, name: "обычный-тег") }
   fab!(:tag_group) do
@@ -27,15 +27,21 @@ RSpec.describe "Tag visible names in tags API" do
     end
   end
 
-  it "adds visible fields without replacing tag slug fields" do
+  it "copies tags.json and adds visible fields without replacing tag slug fields" do
     get "/tags.json"
 
     expect(response.status).to eq(200)
 
+    core_payload = response.parsed_body
+
+    get "/tags_mapping_name.json"
+
+    expect(response.status).to eq(200)
+    expect(strip_visible_fields(response.parsed_body)).to eq(core_payload)
+
     tags = serialized_tags(response.parsed_body)
     serialized_tag = find_serialized_tag(tags, tag.name)
-    serialized_plain_tag =
-      find_serialized_tag(tags, plain_tag.name)
+    serialized_plain_tag = find_serialized_tag(tags, plain_tag.name)
 
     expect(serialized_tag).to be_present
     expect(serialized_tag["visible_name"]).to eq("Красивое техно")
@@ -49,19 +55,11 @@ RSpec.describe "Tag visible names in tags API" do
     expect(serialized_plain_tag["visible_style"]).to eq("default")
   end
 
-  it "does not include visible fields when plugin setting is disabled" do
-    SiteSetting.tag_visible_name_enabled = false
-
-    get "/tags.json"
+  it "is available to anonymous users" do
+    get "/tags_mapping_name.json"
 
     expect(response.status).to eq(200)
-
-    tags = serialized_tags(response.parsed_body)
-    serialized_tag = find_serialized_tag(tags, tag.name)
-
-    expect(serialized_tag).to be_present
-    expect(serialized_tag).not_to have_key("visible_name")
-    expect(serialized_tag).not_to have_key("visible_style")
+    expect(response.parsed_body).to include("tags", "extras")
   end
 
   def find_serialized_tag(tags, name)
@@ -80,5 +78,18 @@ RSpec.describe "Tag visible names in tags API" do
       Array(payload.dig("extras", "tag_groups")).flat_map do |tag_group|
         Array(tag_group["tags"])
       end
+  end
+
+  def strip_visible_fields(value)
+    case value
+    when Array
+      value.map { |item| strip_visible_fields(item) }
+    when Hash
+      value
+        .except("visible_name", "visible_style")
+        .transform_values { |item| strip_visible_fields(item) }
+    else
+      value
+    end
   end
 end

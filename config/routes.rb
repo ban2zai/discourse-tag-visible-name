@@ -6,6 +6,11 @@ Discourse::Application.routes.append do
         format: :json,
       }
 
+  get "/tags_mapping_name" => "discourse_tag_visible_name/public#tags_mapping_name",
+      defaults: {
+        format: :json,
+      }
+
   get "/admin/plugins/tag-visible-names" => "admin/plugins#index",
       constraints: StaffConstraint.new
 
