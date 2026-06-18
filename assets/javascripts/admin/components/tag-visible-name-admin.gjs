@@ -76,20 +76,33 @@ export default class TagVisibleNameAdmin extends Component {
   }
 
   buildTag(tag) {
+    const draftStyle = tag.style || "default";
+
     return {
       ...tag,
-      draftStyle: tag.style || "default",
+      draftStyle,
       draftVisibleName: tag.visible_name || "",
       error: null,
+      styleOptions: this.buildStyleOptions(draftStyle),
     };
   }
 
   buildGroup(group) {
+    const bulkStyle = "default";
+
     return {
       ...group,
-      bulkStyle: "default",
+      bulkStyle,
+      bulkStyleOptions: this.buildStyleOptions(bulkStyle),
       tags: group.tags.map((tag) => this.buildTag(tag)),
     };
+  }
+
+  buildStyleOptions(selectedStyle) {
+    return this.styles.map((style) => ({
+      ...style,
+      selected: style.id === selectedStyle,
+    }));
   }
 
   tagMatches(tag, query) {
@@ -154,13 +167,17 @@ export default class TagVisibleNameAdmin extends Component {
       this.tagGroups.find((item) => item.id === group.id) || group;
 
     targetGroup.bulkStyle = event.target.value;
+    targetGroup.bulkStyleOptions = this.buildStyleOptions(targetGroup.bulkStyle);
     this.tagGroups = [...this.tagGroups];
   }
 
   @action
   applyGroupStyle(group) {
     group.tags.forEach((tag) => {
-      this.syncTagDrafts(tag, { draftStyle: group.bulkStyle });
+      this.syncTagDrafts(tag, {
+        draftStyle: group.bulkStyle,
+        styleOptions: this.buildStyleOptions(group.bulkStyle),
+      });
     });
 
     this.markDirty();
@@ -169,7 +186,12 @@ export default class TagVisibleNameAdmin extends Component {
 
   @action
   updateTagStyle(tag, event) {
-    this.syncTagDrafts(tag, { draftStyle: event.target.value });
+    const draftStyle = event.target.value;
+
+    this.syncTagDrafts(tag, {
+      draftStyle,
+      styleOptions: this.buildStyleOptions(draftStyle),
+    });
     this.markDirty();
     this.refreshCollections();
   }
@@ -240,8 +262,10 @@ export default class TagVisibleNameAdmin extends Component {
                   value={{group.bulkStyle}}
                   {{on "change" (fn this.updateGroupBulkStyle group)}}
                 >
-                  {{#each this.styles as |style|}}
-                    <option value={{style.id}}>{{i18n style.name}}</option>
+                  {{#each group.bulkStyleOptions as |style|}}
+                    <option value={{style.id}} selected={{style.selected}}>
+                      {{i18n style.name}}
+                    </option>
                   {{/each}}
                 </select>
               </label>
@@ -282,8 +306,10 @@ export default class TagVisibleNameAdmin extends Component {
                         value={{tag.draftStyle}}
                         {{on "change" (fn this.updateTagStyle tag)}}
                       >
-                        {{#each this.styles as |style|}}
-                          <option value={{style.id}}>{{i18n style.name}}</option>
+                        {{#each tag.styleOptions as |style|}}
+                          <option value={{style.id}} selected={{style.selected}}>
+                            {{i18n style.name}}
+                          </option>
                         {{/each}}
                       </select>
                     </td>
@@ -328,8 +354,10 @@ export default class TagVisibleNameAdmin extends Component {
                         value={{tag.draftStyle}}
                         {{on "change" (fn this.updateTagStyle tag)}}
                       >
-                        {{#each this.styles as |style|}}
-                          <option value={{style.id}}>{{i18n style.name}}</option>
+                        {{#each tag.styleOptions as |style|}}
+                          <option value={{style.id}} selected={{style.selected}}>
+                            {{i18n style.name}}
+                          </option>
                         {{/each}}
                       </select>
                     </td>

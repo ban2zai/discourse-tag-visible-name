@@ -51,10 +51,24 @@ module ::DiscourseTagVisibleName
         end
       end
 
+      def key_for(name)
+        name.to_s.downcase
+      end
+
       def visible_name_for(tag)
         return if tag.blank?
 
-        mapping[tag_key(tag.name)].presence
+        visible_name_for_name(tag.name)
+      end
+
+      def visible_name_for_name(name, visible_names = nil)
+        visible_names ||= mapping
+        visible_names[key_for(name)].presence
+      end
+
+      def visible_style_for_name(name, tag_styles = nil)
+        tag_styles ||= public_style_mapping
+        valid_style_id(tag_styles[key_for(name)]) || DEFAULT_STYLE
       end
 
       def save!(tag, visible_name)
@@ -220,7 +234,7 @@ module ::DiscourseTagVisibleName
       private
 
       def tag_key(name)
-        name.to_s.downcase
+        key_for(name)
       end
 
       def tag_payloads(visible_names, tag_styles)
