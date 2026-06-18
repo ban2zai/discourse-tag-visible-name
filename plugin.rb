@@ -24,12 +24,12 @@ module ::DiscourseTagVisibleName
   end
 
   def self.cached_visible_names
-    RequestStore.store[:tag_visible_name_visible_names] ||=
+    ::RequestStore.store[:tag_visible_name_visible_names] ||=
       ::DiscourseTagVisibleName::TagVisibleNameStore.mapping
   end
 
   def self.cached_tag_styles
-    RequestStore.store[:tag_visible_name_tag_styles] ||=
+    ::RequestStore.store[:tag_visible_name_tag_styles] ||=
       ::DiscourseTagVisibleName::TagVisibleNameStore.public_style_mapping
   end
 
