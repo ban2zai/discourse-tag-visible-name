@@ -4,7 +4,12 @@ require "rails_helper"
 
 RSpec.describe ::DiscourseTagVisibleName::TagVisibleNameStore do
   fab!(:tag) { Fabricate(:tag, name: "бгу") }
+  fab!(:uppercase_tag) { Fabricate(:tag, name: "Техно") }
   fab!(:tag_group) { Fabricate(:tag_group, name: "Участки", tag_names: [tag.name]) }
+  fab!(:consulting_group) do
+    Fabricate(:tag_group, name: "Консультирование", tag_names: [uppercase_tag.name])
+  end
+  fab!(:areas_group) { Fabricate(:tag_group, name: "Участки 2", tag_names: [uppercase_tag.name]) }
   fab!(:ungrouped_tag) { Fabricate(:tag, name: "без-группы") }
 
   before { SiteSetting.tag_visible_name_enabled = true }
@@ -14,6 +19,13 @@ RSpec.describe ::DiscourseTagVisibleName::TagVisibleNameStore do
       described_class.save!(tag, " БГУ ")
 
       expect(described_class.mapping).to eq("бгу" => "БГУ")
+    end
+
+    it "stores visible names by lowercase tag keys" do
+      described_class.save!(uppercase_tag, " Техно ")
+
+      expect(described_class.mapping).to include("техно" => "Техно")
+      expect(described_class.visible_name_for(uppercase_tag)).to eq("Техно")
     end
 
     it "deletes custom fields for blank values" do
@@ -37,6 +49,14 @@ RSpec.describe ::DiscourseTagVisibleName::TagVisibleNameStore do
       expect(result[:imported]).to eq(["бгу"])
       expect(result[:skipped]).to eq(["нет-такого-тега"])
       expect(described_class.mapping).to eq("бгу" => "БГУ")
+    end
+
+    it "imports tags case-insensitively" do
+      result = described_class.import_mapping!("техно" => "Техно")
+
+      expect(result[:imported]).to eq(["техно"])
+      expect(result[:skipped]).to eq([])
+      expect(described_class.visible_name_for(uppercase_tag)).to eq("Техно")
     end
   end
 
@@ -81,12 +101,12 @@ RSpec.describe ::DiscourseTagVisibleName::TagVisibleNameStore do
       described_class.save_all!(
         tags: [],
         tag_group_styles: { tag_group.id => "area" },
-        tag_styles: { tag.name => "section" },
+        tag_styles: { uppercase_tag.name => "section" },
       )
 
       expect(described_class.style_mapping).to eq(
         "tag_group_styles" => { tag_group.id.to_s => "area" },
-        "tag_styles" => { tag.name => "section" },
+        "tag_styles" => { "техно" => "section" },
       )
     end
   end
@@ -136,6 +156,42 @@ RSpec.describe ::DiscourseTagVisibleName::TagVisibleNameStore do
           .find { |item| item[:id] == ungrouped_tag.id }
 
       expect(ungrouped[:effective_style]).to eq("default")
+    end
+
+    it "shows tags in every tag group membership" do
+      groups_with_tag =
+        described_class
+          .grouped_tags
+          .fetch(:tag_groups)
+          .select do |group|
+            group.fetch(:tags).any? { |item| item[:id] == uppercase_tag.id }
+          end
+
+      expect(groups_with_tag.map { |group| group[:name] }).to contain_exactly(
+        "Консультирование",
+        "Участки 2",
+      )
+    end
+
+    it "excludes grouped tags from ungrouped tags" do
+      ungrouped_ids =
+        described_class.grouped_tags.fetch(:ungrouped_tags).map { |item| item[:id] }
+
+      expect(ungrouped_ids).to include(ungrouped_tag.id)
+      expect(ungrouped_ids).not_to include(uppercase_tag.id)
+    end
+
+    it "uses area group styles before section group styles for public styles" do
+      described_class.save_all!(
+        tags: [],
+        tag_group_styles: {
+          consulting_group.id => "section",
+          areas_group.id => "area",
+        },
+        tag_styles: {},
+      )
+
+      expect(described_class.public_style_mapping["техно"]).to eq("area")
     end
   end
 end

@@ -128,6 +128,15 @@ export default class TagVisibleNameAdmin extends Component {
     this.ungroupedTags = [...this.ungroupedTags];
   }
 
+  syncTagDrafts(tag, fields) {
+    this.allTags
+      .filter((item) => item.id === tag.id)
+      .forEach((item) => {
+        Object.assign(item, fields);
+        item.error = null;
+      });
+  }
+
   @action
   updateFilter(event) {
     this.filter = event.target.value;
@@ -145,16 +154,14 @@ export default class TagVisibleNameAdmin extends Component {
 
   @action
   updateTagStyle(tag, event) {
-    tag.draftStyle = event.target.value;
-    tag.error = null;
+    this.syncTagDrafts(tag, { draftStyle: event.target.value });
     this.markDirty();
     this.refreshCollections();
   }
 
   @action
   updateVisibleName(tag, event) {
-    tag.draftVisibleName = event.target.value;
-    tag.error = null;
+    this.syncTagDrafts(tag, { draftVisibleName: event.target.value });
     this.markDirty();
     this.refreshCollections();
   }

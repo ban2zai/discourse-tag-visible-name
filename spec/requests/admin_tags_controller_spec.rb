@@ -8,6 +8,9 @@ RSpec.describe "Tag visible names admin API" do
   fab!(:tag) { Fabricate(:tag, name: "бгу") }
   fab!(:ungrouped_tag) { Fabricate(:tag, name: "без-группы") }
   fab!(:tag_group) { Fabricate(:tag_group, name: "Участки", tag_names: [tag.name]) }
+  fab!(:second_tag_group) do
+    Fabricate(:tag_group, name: "Консультирование", tag_names: [tag.name])
+  end
 
   before do
     SiteSetting.tag_visible_name_enabled = true
@@ -46,6 +49,8 @@ RSpec.describe "Tag visible names admin API" do
 
       payload = response.parsed_body
       group = payload["tag_groups"].find { |item| item["id"] == tag_group.id }
+      second_group =
+        payload["tag_groups"].find { |item| item["id"] == second_tag_group.id }
 
       expect(payload["styles"]).to include(
         hash_including("id" => "default"),
@@ -62,9 +67,11 @@ RSpec.describe "Tag visible names admin API" do
           "effective_style" => "default",
         ),
       )
+      expect(second_group["tags"]).to include(hash_including("id" => tag.id))
       expect(payload["ungrouped_tags"]).to include(
         hash_including("id" => ungrouped_tag.id, "name" => "без-группы"),
       )
+      expect(payload["ungrouped_tags"]).not_to include(hash_including("id" => tag.id))
     end
   end
 
@@ -116,6 +123,23 @@ RSpec.describe "Tag visible names admin API" do
       expect(styles["tag_styles"]).to include(
         tag.name => "section",
         ungrouped_tag.name => "area",
+      )
+    end
+
+    it "deduplicates repeated tag rows by id" do
+      sign_in(admin)
+
+      put "/admin/plugins/tag-visible-names/tags.json",
+          params: {
+            tags: [
+              { id: tag.id, visible_name: "Первое имя" },
+              { id: tag.id, visible_name: "Второе имя" },
+            ],
+          }
+
+      expect(response.status).to eq(200)
+      expect(::DiscourseTagVisibleName::TagVisibleNameStore.visible_name_for(tag)).to eq(
+        "Первое имя",
       )
     end
   end

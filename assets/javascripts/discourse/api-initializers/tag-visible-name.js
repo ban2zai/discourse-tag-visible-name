@@ -5,7 +5,7 @@ const STYLE_CLASS_PREFIX = "tag-visible-name-style--";
 const STYLE_IDS = ["default", "area", "section"];
 
 function updateTagElement(element, names, styles) {
-  const tagName = element.dataset.tagName;
+  const tagName = element.dataset.tagName?.toLowerCase();
   const visibleName = names[tagName];
   const style = styles[tagName] || "default";
 

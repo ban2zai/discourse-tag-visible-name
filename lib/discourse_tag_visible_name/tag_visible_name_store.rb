@@ -10,6 +10,7 @@ module ::DiscourseTagVisibleName
     STYLE_STORE_KEY = "styles"
     DEFAULT_STYLE = "default"
     STYLE_IDS = [DEFAULT_STYLE, "area", "section"].freeze
+    STYLE_PRIORITY = { DEFAULT_STYLE => 0, "section" => 1, "area" => 2 }.freeze
 
     class << self
       def list
@@ -18,7 +19,7 @@ module ::DiscourseTagVisibleName
 
       def mapping
         raw = ::PluginStore.get(::DiscourseTagVisibleName::PLUGIN_NAME, STORE_KEY)
-        raw.is_a?(Hash) ? raw : {}
+        normalize_visible_names(raw)
       end
 
       def style_mapping
@@ -31,7 +32,7 @@ module ::DiscourseTagVisibleName
 
         {
           "tag_group_styles" => normalize_style_hash(raw["tag_group_styles"]),
-          "tag_styles" => normalize_style_hash(raw["tag_styles"]),
+          "tag_styles" => normalize_style_hash(raw["tag_styles"], tag_keys: true),
         }
       end
 
@@ -40,11 +41,14 @@ module ::DiscourseTagVisibleName
         styles = {}
 
         grouped[:tag_groups].each do |group|
-          group[:tags].each { |tag| styles[tag[:name]] = tag[:effective_style] }
+          group[:tags].each do |tag|
+            key = tag[:key]
+            styles[key] = higher_priority_style(styles[key], tag[:effective_style])
+          end
         end
 
         grouped[:ungrouped_tags].each do |tag|
-          styles[tag[:name]] = tag[:effective_style]
+          styles[tag[:key]] = tag[:effective_style]
         end
 
         styles
@@ -63,20 +67,21 @@ module ::DiscourseTagVisibleName
       def visible_name_for(tag)
         return if tag.blank?
 
-        mapping[tag.name].presence
+        mapping[tag_key(tag.name)].presence
       end
 
       def save!(tag, visible_name)
         value = visible_name.to_s.strip
         visible_names = mapping.dup
+        key = tag_key(tag.name)
 
         if value.blank?
-          visible_names.delete(tag.name)
+          visible_names.delete(key)
           save_mapping!(visible_names)
           return
         end
 
-        visible_names[tag.name] = value
+        visible_names[key] = value
         save_mapping!(visible_names)
         value
       end
@@ -97,9 +102,9 @@ module ::DiscourseTagVisibleName
             (tag_params[:visible_name] || tag_params["visible_name"]).to_s.strip
 
           if value.blank?
-            visible_names.delete(tag.name)
+            visible_names.delete(tag_key(tag.name))
           else
-            visible_names[tag.name] = value
+            visible_names[tag_key(tag.name)] = value
           end
         end
 
@@ -136,13 +141,13 @@ module ::DiscourseTagVisibleName
         skipped = []
 
         mapping.each do |name, visible_name|
-          tag = ::Tag.find_by(name: name.to_s)
+          tag = find_tag_by_key(name)
 
           if tag
             save!(tag, visible_name)
-            imported << name.to_s
+            imported << tag_key(name)
           else
-            skipped << name.to_s
+            skipped << tag_key(name)
           end
         end
 
@@ -163,7 +168,7 @@ module ::DiscourseTagVisibleName
         tag_group_styles = style_settings["tag_group_styles"]
         tag_styles = style_settings["tag_styles"]
         tag_payloads = tag_payloads(visible_names, tag_styles)
-        used_tag_ids = Set.new
+        grouped_tag_ids = Set.new
 
         tag_groups =
           ::TagGroup
@@ -178,9 +183,7 @@ module ::DiscourseTagVisibleName
                   .tags
                   .sort_by(&:name)
                   .filter_map do |tag|
-                    next if used_tag_ids.include?(tag.id)
-
-                    used_tag_ids << tag.id
+                    grouped_tag_ids << tag.id
                     payload = tag_payloads[tag.id]
                     next if !payload
 
@@ -203,7 +206,7 @@ module ::DiscourseTagVisibleName
         ungrouped_tags =
           tag_payloads
             .values
-            .reject { |tag| used_tag_ids.include?(tag[:id]) }
+            .reject { |tag| grouped_tag_ids.include?(tag[:id]) }
             .sort_by { |tag| tag[:name] }
             .map do |tag|
               tag.merge(
@@ -221,6 +224,10 @@ module ::DiscourseTagVisibleName
 
       private
 
+      def tag_key(name)
+        name.to_s.downcase
+      end
+
       def tag_payloads(visible_names, tag_styles)
         count_column = topic_count_column
         columns = [:id, :name]
@@ -232,8 +239,9 @@ module ::DiscourseTagVisibleName
           result[id] = {
             id: id,
             name: name,
-            visible_name: visible_names[name],
-            style: valid_style_id(tag_styles[name]),
+            key: tag_key(name),
+            visible_name: visible_names[tag_key(name)],
+            style: valid_style_id(tag_styles[tag_key(name)]),
             topic_count: topic_count || 0,
           }
         end
@@ -246,20 +254,32 @@ module ::DiscourseTagVisibleName
         valid_style_id(group_style) || DEFAULT_STYLE
       end
 
-      def normalize_style_hash(styles)
+      def higher_priority_style(current_style, new_style)
+        current_style = valid_style_id(current_style) || DEFAULT_STYLE
+        new_style = valid_style_id(new_style) || DEFAULT_STYLE
+
+        if STYLE_PRIORITY[new_style] > STYLE_PRIORITY[current_style]
+          new_style
+        else
+          current_style
+        end
+      end
+
+      def normalize_style_hash(styles, tag_keys: false)
         styles = styles.to_unsafe_h if styles.respond_to?(:to_unsafe_h)
         styles = styles.to_h if styles.respond_to?(:to_h) && !styles.is_a?(Hash)
         return {} if !styles.is_a?(Hash)
 
         styles.each_with_object({}) do |(key, style_id), result|
           style_id = valid_style_id(style_id)
-          result[key.to_s] = style_id if style_id
+          normalized_key = tag_keys ? tag_key(key) : key.to_s
+          result[normalized_key] = style_id if style_id
         end
       end
 
       def save_styles!(tag_group_styles, tag_styles)
         clean_group_styles = normalize_style_hash(tag_group_styles)
-        clean_tag_styles = normalize_style_hash(tag_styles)
+        clean_tag_styles = normalize_style_hash(tag_styles, tag_keys: true)
 
         ::PluginStore.set(
           ::DiscourseTagVisibleName::PLUGIN_NAME,
@@ -281,7 +301,28 @@ module ::DiscourseTagVisibleName
       def normalize_tag_params(tags)
         tags = tags.to_unsafe_h if tags.respond_to?(:to_unsafe_h)
         tags = tags.values if tags.is_a?(Hash)
-        Array(tags)
+        seen_ids = Set.new
+
+        Array(tags).filter_map do |tag|
+          id = (tag[:id] || tag["id"]).to_i
+          next if id <= 0 || seen_ids.include?(id)
+
+          seen_ids << id
+          tag
+        end
+      end
+
+      def find_tag_by_key(name)
+        ::Tag.where("lower(name) = ?", tag_key(name)).first
+      end
+
+      def normalize_visible_names(visible_names)
+        return {} if !visible_names.is_a?(Hash)
+
+        visible_names.each_with_object({}) do |(name, visible_name), result|
+          value = visible_name.to_s.strip
+          result[tag_key(name)] = value if value.present?
+        end
       end
 
       def topic_count_column
@@ -298,7 +339,7 @@ module ::DiscourseTagVisibleName
         clean_mapping =
           visible_names.each_with_object({}) do |(name, visible_name), result|
             value = visible_name.to_s.strip
-            result[name.to_s] = value if value.present?
+            result[tag_key(name)] = value if value.present?
           end
 
         ::PluginStore.set(
