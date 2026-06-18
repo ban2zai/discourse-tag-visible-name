@@ -5,6 +5,9 @@ require "rails_helper"
 RSpec.describe "Tag visible names in tags API" do
   fab!(:tag) { Fabricate(:tag, name: "Техно") }
   fab!(:plain_tag) { Fabricate(:tag, name: "обычный-тег") }
+  fab!(:tag_group) do
+    Fabricate(:tag_group, name: "API tags", tag_names: [tag.name, plain_tag.name])
+  end
 
   before do
     SiteSetting.tagging_enabled = true if SiteSetting.respond_to?(:tagging_enabled=)
@@ -29,7 +32,7 @@ RSpec.describe "Tag visible names in tags API" do
 
     expect(response.status).to eq(200)
 
-    tags = response.parsed_body["tags"]
+    tags = serialized_tags(response.parsed_body)
     serialized_tag = find_serialized_tag(tags, tag.name)
     serialized_plain_tag =
       find_serialized_tag(tags, plain_tag.name)
@@ -53,7 +56,7 @@ RSpec.describe "Tag visible names in tags API" do
 
     expect(response.status).to eq(200)
 
-    tags = response.parsed_body["tags"]
+    tags = serialized_tags(response.parsed_body)
     serialized_tag = find_serialized_tag(tags, tag.name)
 
     expect(serialized_tag).to be_present
@@ -70,5 +73,12 @@ RSpec.describe "Tag visible names in tags API" do
         .map { |value| value.to_s.downcase }
         .include?(key)
     end
+  end
+
+  def serialized_tags(payload)
+    Array(payload["tags"]) +
+      Array(payload.dig("extras", "tag_groups")).flat_map do |tag_group|
+        Array(tag_group["tags"])
+      end
   end
 end

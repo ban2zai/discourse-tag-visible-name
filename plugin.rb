@@ -32,6 +32,36 @@ module ::DiscourseTagVisibleName
     RequestStore.store[:tag_visible_name_tag_styles] ||=
       ::DiscourseTagVisibleName::TagVisibleNameStore.public_style_mapping
   end
+
+  def self.visible_tag_fields(name)
+    {
+      visible_name:
+        ::DiscourseTagVisibleName::TagVisibleNameStore.visible_name_for_name(
+          name,
+          cached_visible_names,
+        ),
+      visible_style:
+        ::DiscourseTagVisibleName::TagVisibleNameStore.visible_style_for_name(
+          name,
+          cached_tag_styles,
+        ),
+    }
+  end
+
+  def self.add_visible_fields_to_tag_payload(tag_payload)
+    return tag_payload if !SiteSetting.tag_visible_name_enabled
+
+    tag_name = serializer_tag_name(tag_payload)
+    return tag_payload if tag_name.blank?
+
+    visible_fields = visible_tag_fields(tag_name)
+
+    if tag_payload.respond_to?(:merge)
+      tag_payload.merge(visible_fields.stringify_keys)
+    else
+      tag_payload
+    end
+  end
 end
 
 require_relative "lib/discourse_tag_visible_name/engine"
@@ -68,5 +98,17 @@ after_initialize do
         SiteSetting.tag_visible_name_enabled
       end
     end
+  end
+
+  if defined?(TagGroupSerializer)
+    module ::DiscourseTagVisibleName::TagGroupSerializerExtension
+      def tags
+        Array(super).map do |tag_payload|
+          ::DiscourseTagVisibleName.add_visible_fields_to_tag_payload(tag_payload)
+        end
+      end
+    end
+
+    TagGroupSerializer.prepend(::DiscourseTagVisibleName::TagGroupSerializerExtension)
   end
 end
