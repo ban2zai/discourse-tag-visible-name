@@ -16,10 +16,10 @@ en:
         saving: "Saving..."
         save_error: "Failed to save."
         style: "Style"
-        group_style: "Group style"
+        bulk_style: "Bulk style"
+        apply_group_style: "Apply to group"
         ungrouped: "Ungrouped"
         styles:
-          inherit: "Inherit"
           default: "Default"
           area: "Area"
           section: "Section"

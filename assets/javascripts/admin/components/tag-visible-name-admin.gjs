@@ -30,6 +30,12 @@ export default class TagVisibleNameAdmin extends Component {
     ];
   }
 
+  get uniqueTags() {
+    const tagsById = new Map();
+    this.allTags.forEach((tag) => tagsById.set(tag.id, tag));
+    return [...tagsById.values()];
+  }
+
   get filteredTagGroups() {
     const query = this.normalizedFilter;
 
@@ -72,7 +78,7 @@ export default class TagVisibleNameAdmin extends Component {
   buildTag(tag) {
     return {
       ...tag,
-      draftStyle: tag.style || "inherit",
+      draftStyle: tag.style || "default",
       draftVisibleName: tag.visible_name || "",
       error: null,
     };
@@ -81,7 +87,7 @@ export default class TagVisibleNameAdmin extends Component {
   buildGroup(group) {
     return {
       ...group,
-      draftStyle: group.style || "default",
+      bulkStyle: "default",
       tags: group.tags.map((tag) => this.buildTag(tag)),
     };
   }
@@ -143,13 +149,22 @@ export default class TagVisibleNameAdmin extends Component {
   }
 
   @action
-  updateGroupStyle(group, event) {
+  updateGroupBulkStyle(group, event) {
     const targetGroup =
       this.tagGroups.find((item) => item.id === group.id) || group;
 
-    targetGroup.draftStyle = event.target.value;
-    this.markDirty();
+    targetGroup.bulkStyle = event.target.value;
     this.tagGroups = [...this.tagGroups];
+  }
+
+  @action
+  applyGroupStyle(group) {
+    group.tags.forEach((tag) => {
+      this.syncTagDrafts(tag, { draftStyle: group.bulkStyle });
+    });
+
+    this.markDirty();
+    this.refreshCollections();
   }
 
   @action
@@ -172,24 +187,13 @@ export default class TagVisibleNameAdmin extends Component {
     this.saveError = null;
     this.saveMessage = null;
 
-    const tagGroupStyles = {};
-    this.tagGroups.forEach((group) => {
-      tagGroupStyles[group.id] = group.draftStyle;
-    });
-
-    const tagStyles = {};
-    this.allTags.forEach((tag) => {
-      tagStyles[tag.name] = tag.draftStyle;
-    });
-
     try {
       const data = await ajax("/admin/plugins/tag-visible-names/tags", {
         type: "PUT",
         data: {
-          tag_group_styles: tagGroupStyles,
-          tag_styles: tagStyles,
-          tags: this.allTags.map((tag) => ({
+          tags: this.uniqueTags.map((tag) => ({
             id: tag.id,
+            style: tag.draftStyle,
             visible_name: tag.draftVisibleName,
           })),
         },
@@ -231,16 +235,24 @@ export default class TagVisibleNameAdmin extends Component {
               <h3>{{group.name}}</h3>
 
               <label>
-                <span>{{i18n "tag_visible_name.admin.group_style"}}</span>
+                <span>{{i18n "tag_visible_name.admin.bulk_style"}}</span>
                 <select
-                  value={{group.draftStyle}}
-                  {{on "change" (fn this.updateGroupStyle group)}}
+                  value={{group.bulkStyle}}
+                  {{on "change" (fn this.updateGroupBulkStyle group)}}
                 >
                   {{#each this.styles as |style|}}
                     <option value={{style.id}}>{{i18n style.name}}</option>
                   {{/each}}
                 </select>
               </label>
+
+              <button
+                type="button"
+                class="btn"
+                {{on "click" (fn this.applyGroupStyle group)}}
+              >
+                {{i18n "tag_visible_name.admin.apply_group_style"}}
+              </button>
             </div>
 
             <table class="tag-visible-name-admin__table">
@@ -270,9 +282,6 @@ export default class TagVisibleNameAdmin extends Component {
                         value={{tag.draftStyle}}
                         {{on "change" (fn this.updateTagStyle tag)}}
                       >
-                        <option value="inherit">
-                          {{i18n "tag_visible_name.admin.styles.inherit"}}
-                        </option>
                         {{#each this.styles as |style|}}
                           <option value={{style.id}}>{{i18n style.name}}</option>
                         {{/each}}
@@ -319,9 +328,6 @@ export default class TagVisibleNameAdmin extends Component {
                         value={{tag.draftStyle}}
                         {{on "change" (fn this.updateTagStyle tag)}}
                       >
-                        <option value="inherit">
-                          {{i18n "tag_visible_name.admin.styles.inherit"}}
-                        </option>
                         {{#each this.styles as |style|}}
                           <option value={{style.id}}>{{i18n style.name}}</option>
                         {{/each}}

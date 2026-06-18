@@ -1,17 +1,18 @@
 # discourse-tag-visible-name
 
-Плагин добавляет редактируемые отображаемые имена для тегов Discourse.
+Плагин добавляет редактируемые отображаемые имена и стили для тегов Discourse.
 
-Системный slug тега не меняется: URL, `data-tag-name`, tag groups и composer продолжают работать с настоящим именем тега. Плагин хранит mapping `tag_slug -> visible_name` в `PluginStore`.
+Системный slug тега не меняется: URL, `data-tag-name`, tag groups и composer продолжают работать с настоящим именем тега. Плагин хранит настройки в `PluginStore`.
 
 ## Возможности
 
 - Админская страница: `/admin/plugins/tag-visible-names`.
 - API для админки:
   - `GET /admin/plugins/tag-visible-names/tags`
-  - `PUT /admin/plugins/tag-visible-names/tags/:id`
-- Публичная подмена текста ссылок `a.discourse-tag[data-tag-name]`.
-- Импорт YAML/JSON mapping.
+  - `PUT /admin/plugins/tag-visible-names/tags`
+- Публичный endpoint: `GET /tag-visible-names.json`.
+- Публичная подмена текста тегов `a.discourse-tag[data-tag-name]` и `.discourse-tags .discourse-tag[data-tag-name]`.
+- Импорт YAML/JSON mapping через rake.
 
 ## Импорт текущих названий
 

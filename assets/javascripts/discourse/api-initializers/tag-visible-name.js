@@ -3,6 +3,8 @@ import { ajax } from "discourse/lib/ajax";
 
 const STYLE_CLASS_PREFIX = "tag-visible-name-style--";
 const STYLE_IDS = ["default", "area", "section"];
+const TAG_SELECTOR =
+  "a.discourse-tag[data-tag-name], .discourse-tags .discourse-tag[data-tag-name]";
 
 function updateTagElement(element, names, styles) {
   const tagName = element.dataset.tagName?.toLowerCase();
@@ -32,11 +34,11 @@ function updateTagElements(root, names, styles) {
     return;
   }
 
-  if (root.matches?.("a.discourse-tag[data-tag-name]")) {
+  if (root.matches?.(TAG_SELECTOR)) {
     updateTagElement(root, names, styles);
   }
 
-  root.querySelectorAll?.("a.discourse-tag[data-tag-name]").forEach((element) =>
+  root.querySelectorAll?.(TAG_SELECTOR).forEach((element) =>
     updateTagElement(element, names, styles)
   );
 }

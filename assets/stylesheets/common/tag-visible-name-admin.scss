@@ -91,7 +91,8 @@
   display: none;
 }
 
-a.discourse-tag {
+a.discourse-tag,
+.discourse-tags .discourse-tag {
   margin: 2px 2px 0 0 !important;
   padding: 4px 8px !important;
   border-radius: 4px !important;

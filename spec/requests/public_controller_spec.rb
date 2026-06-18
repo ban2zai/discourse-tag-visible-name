@@ -8,14 +8,10 @@ RSpec.describe "Tag visible names public API" do
   before { SiteSetting.tag_visible_name_enabled = true }
 
   describe "GET /tag-visible-names" do
-    it "returns visible name and style mappings" do
+    it "returns lowercase visible name and style mappings" do
       ::DiscourseTagVisibleName::TagVisibleNameStore.save!(tag, "Техно")
       ::DiscourseTagVisibleName::TagVisibleNameStore.save_all!(
-        tags: [],
-        tag_group_styles: {},
-        tag_styles: {
-          tag.name => "area",
-        },
+        tags: [{ id: tag.id, style: "area" }],
       )
 
       get "/tag-visible-names.json"

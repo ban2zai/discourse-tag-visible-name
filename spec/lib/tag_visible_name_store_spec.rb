@@ -28,7 +28,7 @@ RSpec.describe ::DiscourseTagVisibleName::TagVisibleNameStore do
       expect(described_class.visible_name_for(uppercase_tag)).to eq("Техно")
     end
 
-    it "deletes custom fields for blank values" do
+    it "deletes visible names for blank values" do
       described_class.save!(tag, "БГУ")
       described_class.save!(tag, "")
 
@@ -88,36 +88,30 @@ RSpec.describe ::DiscourseTagVisibleName::TagVisibleNameStore do
 
   describe ".save_all!" do
     it "keeps visible names compatible with the existing store key" do
-      described_class.save_all!(
-        tags: [{ id: tag.id, visible_name: " БГУ " }],
-        tag_group_styles: {},
-        tag_styles: {},
-      )
+      described_class.save_all!(tags: [{ id: tag.id, visible_name: " БГУ " }])
 
       expect(described_class.mapping).to eq("бгу" => "БГУ")
     end
 
-    it "stores group and tag style settings" do
-      described_class.save_all!(
-        tags: [],
-        tag_group_styles: { tag_group.id => "area" },
-        tag_styles: { uppercase_tag.name => "section" },
-      )
+    it "stores tag style settings by lowercase keys" do
+      described_class.save_all!(tags: [{ id: uppercase_tag.id, style: "section" }])
 
       expect(described_class.style_mapping).to eq(
-        "tag_group_styles" => { tag_group.id.to_s => "area" },
         "tag_styles" => { "техно" => "section" },
       )
+    end
+
+    it "removes tag style settings when style is default" do
+      described_class.save_all!(tags: [{ id: tag.id, style: "area" }])
+      described_class.save_all!(tags: [{ id: tag.id, style: "default" }])
+
+      expect(described_class.style_mapping).to eq("tag_styles" => {})
     end
   end
 
   describe ".grouped_tags" do
-    it "uses tag style overrides before group styles" do
-      described_class.save_all!(
-        tags: [],
-        tag_group_styles: { tag_group.id => "area" },
-        tag_styles: { tag.name => "section" },
-      )
+    it "uses tag styles directly" do
+      described_class.save_all!(tags: [{ id: tag.id, style: "section" }])
 
       grouped_tag =
         described_class
@@ -127,25 +121,32 @@ RSpec.describe ::DiscourseTagVisibleName::TagVisibleNameStore do
           .fetch(:tags)
           .find { |item| item[:id] == tag.id }
 
-      expect(grouped_tag[:effective_style]).to eq("section")
+      expect(grouped_tag[:style]).to eq("section")
     end
 
-    it "uses group styles when tag override is inherited" do
-      described_class.save_all!(
-        tags: [],
-        tag_group_styles: { tag_group.id => "area" },
-        tag_styles: { tag.name => "inherit" },
+    it "uses legacy group styles as fallback before the first tag-level save" do
+      ::PluginStore.set(
+        ::DiscourseTagVisibleName::PLUGIN_NAME,
+        described_class::STYLE_STORE_KEY,
+        {
+          "tag_group_styles" => {
+            consulting_group.id.to_s => "section",
+            areas_group.id.to_s => "area",
+          },
+          "tag_styles" => {},
+        },
       )
 
       grouped_tag =
         described_class
           .grouped_tags
           .fetch(:tag_groups)
-          .find { |group| group[:id] == tag_group.id }
+          .find { |group| group[:id] == consulting_group.id }
           .fetch(:tags)
-          .find { |item| item[:id] == tag.id }
+          .find { |item| item[:id] == uppercase_tag.id }
 
-      expect(grouped_tag[:effective_style]).to eq("area")
+      expect(grouped_tag[:style]).to eq("area")
+      expect(described_class.public_style_mapping["техно"]).to eq("area")
     end
 
     it "uses default style for ungrouped tags without overrides" do
@@ -155,7 +156,7 @@ RSpec.describe ::DiscourseTagVisibleName::TagVisibleNameStore do
           .dig(:ungrouped_tags)
           .find { |item| item[:id] == ungrouped_tag.id }
 
-      expect(ungrouped[:effective_style]).to eq("default")
+      expect(ungrouped[:style]).to eq("default")
     end
 
     it "shows tags in every tag group membership" do
@@ -181,17 +182,22 @@ RSpec.describe ::DiscourseTagVisibleName::TagVisibleNameStore do
       expect(ungrouped_ids).not_to include(uppercase_tag.id)
     end
 
-    it "uses area group styles before section group styles for public styles" do
-      described_class.save_all!(
-        tags: [],
-        tag_group_styles: {
-          consulting_group.id => "section",
-          areas_group.id => "area",
+    it "rewrites legacy group styles on save" do
+      ::PluginStore.set(
+        ::DiscourseTagVisibleName::PLUGIN_NAME,
+        described_class::STYLE_STORE_KEY,
+        {
+          "tag_group_styles" => {
+            consulting_group.id.to_s => "section",
+            areas_group.id.to_s => "area",
+          },
+          "tag_styles" => {},
         },
-        tag_styles: {},
       )
+      described_class.save_all!(tags: [{ id: uppercase_tag.id, style: "default" }])
 
-      expect(described_class.public_style_mapping["техно"]).to eq("area")
+      expect(described_class.style_mapping).to eq("tag_styles" => {})
+      expect(described_class.public_style_mapping["техно"]).to be_nil
     end
   end
 end

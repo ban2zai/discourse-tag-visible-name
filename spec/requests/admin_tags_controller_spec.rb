@@ -42,6 +42,9 @@ RSpec.describe "Tag visible names admin API" do
     it "returns grouped tags for admins" do
       sign_in(admin)
       ::DiscourseTagVisibleName::TagVisibleNameStore.save!(tag, "БГУ")
+      ::DiscourseTagVisibleName::TagVisibleNameStore.save_all!(
+        tags: [{ id: tag.id, style: "area" }],
+      )
 
       get "/admin/plugins/tag-visible-names/tags.json"
 
@@ -57,16 +60,18 @@ RSpec.describe "Tag visible names admin API" do
         hash_including("id" => "area"),
         hash_including("id" => "section"),
       )
-      expect(group).to include("name" => "Участки", "style" => "default")
+      expect(group).to include("name" => "Участки")
+      expect(group).not_to include("style")
       expect(group["tags"]).to include(
         hash_including(
           "id" => tag.id,
           "name" => "бгу",
           "visible_name" => "БГУ",
+          "style" => "area",
           "topic_count" => 2,
-          "effective_style" => "default",
         ),
       )
+      expect(group["tags"].first).not_to include("effective_style")
       expect(second_group["tags"]).to include(hash_including("id" => tag.id))
       expect(payload["ungrouped_tags"]).to include(
         hash_including("id" => ungrouped_tag.id, "name" => "без-группы"),
@@ -96,21 +101,14 @@ RSpec.describe "Tag visible names admin API" do
       expect(response.status).to eq(403)
     end
 
-    it "saves visible names and styles in bulk" do
+    it "saves visible names and tag styles in bulk" do
       sign_in(admin)
 
       put "/admin/plugins/tag-visible-names/tags.json",
           params: {
-            tag_group_styles: {
-              tag_group.id => "area",
-            },
-            tag_styles: {
-              tag.name => "section",
-              ungrouped_tag.name => "area",
-            },
             tags: [
-              { id: tag.id, visible_name: " БГУ " },
-              { id: ungrouped_tag.id, visible_name: " " },
+              { id: tag.id, visible_name: " БГУ ", style: "section" },
+              { id: ungrouped_tag.id, visible_name: " ", style: "area" },
             ],
           }
 
@@ -119,10 +117,11 @@ RSpec.describe "Tag visible names admin API" do
       expect(::DiscourseTagVisibleName::TagVisibleNameStore.visible_name_for(ungrouped_tag)).to be_nil
 
       styles = ::DiscourseTagVisibleName::TagVisibleNameStore.style_mapping
-      expect(styles["tag_group_styles"]).to include(tag_group.id.to_s => "area")
-      expect(styles["tag_styles"]).to include(
-        tag.name => "section",
-        ungrouped_tag.name => "area",
+      expect(styles).to eq(
+        "tag_styles" => {
+          tag.name => "section",
+          ungrouped_tag.name => "area",
+        },
       )
     end
 
@@ -132,14 +131,17 @@ RSpec.describe "Tag visible names admin API" do
       put "/admin/plugins/tag-visible-names/tags.json",
           params: {
             tags: [
-              { id: tag.id, visible_name: "Первое имя" },
-              { id: tag.id, visible_name: "Второе имя" },
+              { id: tag.id, visible_name: "Первое имя", style: "area" },
+              { id: tag.id, visible_name: "Второе имя", style: "section" },
             ],
           }
 
       expect(response.status).to eq(200)
       expect(::DiscourseTagVisibleName::TagVisibleNameStore.visible_name_for(tag)).to eq(
         "Первое имя",
+      )
+      expect(::DiscourseTagVisibleName::TagVisibleNameStore.style_mapping).to eq(
+        "tag_styles" => { tag.name => "area" },
       )
     end
   end

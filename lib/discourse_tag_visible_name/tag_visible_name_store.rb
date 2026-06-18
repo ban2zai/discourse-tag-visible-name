@@ -28,29 +28,16 @@ module ::DiscourseTagVisibleName
             ::DiscourseTagVisibleName::PLUGIN_NAME,
             STYLE_STORE_KEY,
           )
-        return { "tag_group_styles" => {}, "tag_styles" => {} } if !raw.is_a?(Hash)
+        return { "tag_styles" => {} } if !raw.is_a?(Hash)
 
         {
-          "tag_group_styles" => normalize_style_hash(raw["tag_group_styles"]),
           "tag_styles" => normalize_style_hash(raw["tag_styles"], tag_keys: true),
         }
       end
 
       def public_style_mapping
-        grouped = grouped_tags
-        styles = {}
-
-        grouped[:tag_groups].each do |group|
-          group[:tags].each do |tag|
-            key = tag[:key]
-            styles[key] = higher_priority_style(styles[key], tag[:effective_style])
-          end
-        end
-
-        grouped[:ungrouped_tags].each do |tag|
-          styles[tag[:key]] = tag[:effective_style]
-        end
-
+        styles = legacy_public_style_mapping
+        style_mapping["tag_styles"].each { |key, style| styles[key] = style }
         styles
       end
 
@@ -86,30 +73,52 @@ module ::DiscourseTagVisibleName
         value
       end
 
-      def save_all!(tags:, tag_group_styles:, tag_styles:)
+      def save_all!(tags:, tag_styles: nil)
         tags = normalize_tag_params(tags)
         tag_by_id =
           ::Tag
             .where(id: tags.map { |tag| tag[:id] || tag["id"] })
             .index_by(&:id)
         visible_names = mapping.dup
+        styles = style_mapping["tag_styles"].dup
+        tag_styles = normalize_style_hash(tag_styles, tag_keys: true)
 
         tags.each do |tag_params|
           tag = tag_by_id[(tag_params[:id] || tag_params["id"]).to_i]
           next if !tag
 
-          value =
-            (tag_params[:visible_name] || tag_params["visible_name"]).to_s.strip
+          if tag_params.key?(:visible_name) || tag_params.key?("visible_name")
+            value =
+              (tag_params[:visible_name] || tag_params["visible_name"]).to_s.strip
 
-          if value.blank?
-            visible_names.delete(tag_key(tag.name))
+            if value.blank?
+              visible_names.delete(tag_key(tag.name))
+            else
+              visible_names[tag_key(tag.name)] = value
+            end
+          end
+
+          style =
+            if tag_params.key?(:style) || tag_params.key?("style")
+              tag_params[:style] || tag_params["style"]
+            else
+              tag_styles[tag_key(tag.name)]
+            end
+
+          next if style.nil?
+
+          style = valid_style_id(style) || DEFAULT_STYLE
+          key = tag_key(tag.name)
+
+          if style == DEFAULT_STYLE
+            styles.delete(key)
           else
-            visible_names[tag_key(tag.name)] = value
+            styles[key] = style
           end
         end
 
         save_mapping!(visible_names)
-        save_styles!(tag_group_styles, tag_styles)
+        save_styles!(styles)
       end
 
       def import_file!(path)
@@ -165,8 +174,8 @@ module ::DiscourseTagVisibleName
       def grouped_tags
         visible_names = mapping
         style_settings = style_mapping
-        tag_group_styles = style_settings["tag_group_styles"]
-        tag_styles = style_settings["tag_styles"]
+        tag_styles =
+          legacy_tag_style_fallbacks.merge(style_settings["tag_styles"])
         tag_payloads = tag_payloads(visible_names, tag_styles)
         grouped_tag_ids = Set.new
 
@@ -175,9 +184,6 @@ module ::DiscourseTagVisibleName
             .includes(:tags)
             .order(:name)
             .map do |tag_group|
-              group_style =
-                valid_style_id(tag_group_styles[tag_group.id.to_s]) ||
-                  DEFAULT_STYLE
               tags =
                 tag_group
                   .tags
@@ -187,17 +193,12 @@ module ::DiscourseTagVisibleName
                     payload = tag_payloads[tag.id]
                     next if !payload
 
-                    payload.merge(
-                      group_style: group_style,
-                      effective_style:
-                        effective_style(payload[:style], group_style),
-                    )
+                    payload
                   end
 
               {
                 id: tag_group.id,
                 name: tag_group.name,
-                style: group_style,
                 tags: tags,
               }
             end
@@ -208,12 +209,6 @@ module ::DiscourseTagVisibleName
             .values
             .reject { |tag| grouped_tag_ids.include?(tag[:id]) }
             .sort_by { |tag| tag[:name] }
-            .map do |tag|
-              tag.merge(
-                group_style: DEFAULT_STYLE,
-                effective_style: effective_style(tag[:style], DEFAULT_STYLE),
-              )
-            end
 
         {
           styles: styles(),
@@ -241,17 +236,10 @@ module ::DiscourseTagVisibleName
             name: name,
             key: tag_key(name),
             visible_name: visible_names[tag_key(name)],
-            style: valid_style_id(tag_styles[tag_key(name)]),
+            style: valid_style_id(tag_styles[tag_key(name)]) || DEFAULT_STYLE,
             topic_count: topic_count || 0,
           }
         end
-      end
-
-      def effective_style(tag_style, group_style)
-        tag_style = valid_style_id(tag_style)
-        return tag_style if tag_style
-
-        valid_style_id(group_style) || DEFAULT_STYLE
       end
 
       def higher_priority_style(current_style, new_style)
@@ -277,23 +265,53 @@ module ::DiscourseTagVisibleName
         end
       end
 
-      def save_styles!(tag_group_styles, tag_styles)
-        clean_group_styles = normalize_style_hash(tag_group_styles)
-        clean_tag_styles = normalize_style_hash(tag_styles, tag_keys: true)
+      def legacy_public_style_mapping
+        legacy_styles = legacy_tag_style_fallbacks
+        legacy_styles.delete_if { |_key, style| style == DEFAULT_STYLE }
+      end
+
+      def legacy_tag_group_styles
+        raw =
+          ::PluginStore.get(
+            ::DiscourseTagVisibleName::PLUGIN_NAME,
+            STYLE_STORE_KEY,
+          )
+        return {} if !raw.is_a?(Hash)
+
+        normalize_style_hash(raw["tag_group_styles"])
+      end
+
+      def legacy_tag_style_fallbacks
+        tag_group_styles = legacy_tag_group_styles
+        return {} if tag_group_styles.blank?
+
+        ::TagGroup.includes(:tags).each_with_object({}) do |tag_group, result|
+          group_style = valid_style_id(tag_group_styles[tag_group.id.to_s])
+          next if !group_style || group_style == DEFAULT_STYLE
+
+          tag_group.tags.each do |tag|
+            key = tag_key(tag.name)
+            result[key] = higher_priority_style(result[key], group_style)
+          end
+        end
+      end
+
+      def save_styles!(tag_styles)
+        clean_tag_styles =
+          normalize_style_hash(tag_styles, tag_keys: true).reject do |_key, style|
+            style == DEFAULT_STYLE
+          end
 
         ::PluginStore.set(
           ::DiscourseTagVisibleName::PLUGIN_NAME,
           STYLE_STORE_KEY,
-          {
-            "tag_group_styles" => clean_group_styles,
-            "tag_styles" => clean_tag_styles,
-          },
+          { "tag_styles" => clean_tag_styles },
         )
       end
 
       def valid_style_id(style_id)
         style_id = style_id.to_s
-        return if style_id.blank? || style_id == "inherit"
+        return if style_id.blank?
 
         STYLE_IDS.include?(style_id) ? style_id : nil
       end

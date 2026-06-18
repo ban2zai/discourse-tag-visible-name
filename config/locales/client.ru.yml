@@ -16,10 +16,10 @@ ru:
         saving: "Сохранение..."
         save_error: "Не удалось сохранить."
         style: "Стиль"
-        group_style: "Стиль группы"
+        bulk_style: "Массовый стиль"
+        apply_group_style: "Применить к группе"
         ungrouped: "Без группы"
         styles:
-          inherit: "Наследовать"
           default: "Обычный"
           area: "Участок"
           section: "Раздел"

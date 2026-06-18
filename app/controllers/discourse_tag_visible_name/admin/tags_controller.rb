@@ -14,7 +14,6 @@ module ::DiscourseTagVisibleName
       def update
         ::DiscourseTagVisibleName::TagVisibleNameStore.save_all!(
           tags: params[:tags] || [],
-          tag_group_styles: params[:tag_group_styles] || {},
           tag_styles: params[:tag_styles] || {},
         )
 
