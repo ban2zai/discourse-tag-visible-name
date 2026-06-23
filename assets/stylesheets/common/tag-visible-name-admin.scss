@@ -120,3 +120,39 @@ a.discourse-tag,
     color: var(--primary) !important;
   }
 }
+
+.select-kit .selected-choice {
+  &.tag-visible-name-style--area,
+  &.tag-visible-name-style--section {
+    margin: 2px 2px 0 0;
+    padding: 4px 8px;
+    border-radius: 4px;
+    max-width: 240px;
+
+    .d-button-label {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+
+  &.tag-visible-name-style--area {
+    border: none;
+    background-color: #ffb900;
+    color: #000;
+
+    .d-icon {
+      color: currentcolor;
+    }
+
+    &:hover,
+    &:focus {
+      background-color: var(--primary-low-mid);
+      color: #000;
+    }
+  }
+
+  &.tag-visible-name-style--section {
+    color: var(--primary);
+  }
+}
