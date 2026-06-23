@@ -124,10 +124,11 @@ a.discourse-tag,
 .select-kit .selected-choice {
   &.tag-visible-name-style--area,
   &.tag-visible-name-style--section {
-    margin: 2px 2px 0 0;
-    padding: 3px 7px;
+    margin: 0;
+    padding: 2px 6px;
     border-radius: 4px;
     max-width: 240px;
+    font-size: var(--font-down-2);
     line-height: normal;
 
     .d-button-label {
@@ -159,13 +160,19 @@ a.discourse-tag,
   }
 }
 
-.native-tag-filter-chooser-item {
-  flex: 1 1 320px;
-  max-width: 520px;
+.select-kit.multi-select .selected-content {
+  gap: var(--space-3);
 }
 
+.native-tag-filter-chooser-item {
+  flex: 1 1 500px;
+  max-width: 500px;
+}
+
+.tags-intersection-chooser.select-kit.multi-select,
 .native-tag-filter-chooser.select-kit {
-  width: min(520px, 100%);
+  width: min(500px, 100%);
+  max-width: 500px;
 }
 
 .native-tag-filter-chooser .select-kit-header-wrapper {
@@ -174,9 +181,9 @@ a.discourse-tag,
 
 .select-kit .tag-visible-name-formatted-selection {
   display: flex;
-  column-gap: 4px;
+  column-gap: var(--space-3);
   align-items: center;
-  flex: 1 1 auto;
+  flex: 1 1 0;
   min-width: 0;
   max-width: 100%;
   overflow: hidden;
@@ -190,15 +197,16 @@ a.discourse-tag,
   flex: 0 1 auto;
   min-width: 0;
   max-width: 220px;
-  height: 22px;
-  padding: 2px 7px;
+  height: 20px;
+  padding: 1px 6px;
   border: var(--d-button-default-border);
   border-radius: 4px;
   background-color: var(--d-button-default-bg-color);
   color: var(--d-button-default-text-color);
-  font-size: var(--font-down-1);
+  font-size: var(--font-down-2);
   font-weight: 400;
   line-height: normal;
+  overflow: hidden;
   white-space: nowrap;
 
   .d-button-label {
@@ -218,8 +226,9 @@ a.discourse-tag,
   }
 
   &.tag-visible-name-style--section {
-    flex: 1 1 auto;
-    min-width: 56px;
+    flex: 1 1 0;
+    max-width: none;
+    min-width: 0;
     color: var(--primary);
   }
 }
