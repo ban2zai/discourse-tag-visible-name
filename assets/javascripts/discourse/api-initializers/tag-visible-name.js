@@ -101,11 +101,21 @@ function buildFormattedSelectionTag(tagName, names, styles) {
   const trimmedName = tagName.trim();
   const visibleName = visibleNameFor(trimmedName, names) || trimmedName;
   const tag = document.createElement("span");
+  const label = document.createElement("span");
 
-  tag.classList.add("discourse-tag", "box", "tag-visible-name-summary-tag");
+  tag.classList.add(
+    "btn",
+    "btn-default",
+    "selected-choice",
+    "tag-visible-name-summary-tag"
+  );
   tag.dataset.tagName = trimmedName;
-  tag.textContent = visibleName;
   tag.title = visibleName;
+
+  label.classList.add("d-button-label");
+  label.textContent = visibleName;
+  tag.appendChild(label);
+
   applyStyleClass(tag, styleFor(trimmedName, styles));
 
   return { element: tag, visibleName };
