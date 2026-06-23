@@ -103,12 +103,7 @@ function buildFormattedSelectionTag(tagName, names, styles) {
   const tag = document.createElement("span");
   const label = document.createElement("span");
 
-  tag.classList.add(
-    "btn",
-    "btn-default",
-    "selected-choice",
-    "tag-visible-name-summary-tag"
-  );
+  tag.classList.add("tag-visible-name-summary-tag");
   tag.dataset.tagName = trimmedName;
   tag.title = visibleName;
 

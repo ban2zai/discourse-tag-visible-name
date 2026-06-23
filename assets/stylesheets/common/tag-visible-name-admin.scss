@@ -125,11 +125,13 @@ a.discourse-tag,
   &.tag-visible-name-style--area,
   &.tag-visible-name-style--section {
     margin: 2px 2px 0 0;
-    padding: 4px 8px;
+    padding: 3px 7px;
     border-radius: 4px;
     max-width: 240px;
+    line-height: normal;
 
     .d-button-label {
+      min-width: 0;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
@@ -157,10 +159,24 @@ a.discourse-tag,
   }
 }
 
+.native-tag-filter-chooser-item {
+  flex: 1 1 320px;
+  max-width: 520px;
+}
+
+.native-tag-filter-chooser.select-kit {
+  width: min(520px, 100%);
+}
+
+.native-tag-filter-chooser .select-kit-header-wrapper {
+  min-width: 0;
+}
+
 .select-kit .tag-visible-name-formatted-selection {
   display: flex;
   column-gap: 4px;
   align-items: center;
+  flex: 1 1 auto;
   min-width: 0;
   max-width: 100%;
   overflow: hidden;
@@ -168,23 +184,42 @@ a.discourse-tag,
 }
 
 .select-kit .tag-visible-name-summary-tag {
+  display: inline-flex;
+  box-sizing: border-box;
+  align-items: center;
   flex: 0 1 auto;
   min-width: 0;
-  max-width: 240px;
+  max-width: 220px;
+  height: 22px;
+  padding: 2px 7px;
+  border: var(--d-button-default-border);
+  border-radius: 4px;
+  background-color: var(--d-button-default-bg-color);
+  color: var(--d-button-default-text-color);
+  font-size: var(--font-down-1);
+  font-weight: 400;
+  line-height: normal;
+  white-space: nowrap;
 
   .d-button-label {
+    display: block;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
   &.tag-visible-name-style--area {
+    flex: 0 0 auto;
+    max-width: 90px;
     border: none;
     background-color: #ffb900;
     color: #000;
   }
 
   &.tag-visible-name-style--section {
+    flex: 1 1 auto;
+    min-width: 56px;
     color: var(--primary);
   }
 }
