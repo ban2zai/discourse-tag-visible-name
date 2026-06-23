@@ -172,12 +172,10 @@ a.discourse-tag,
 }
 
 .native-tag-filter-chooser .select-kit-header-wrapper {
+  align-items: center;
+  height: 19px;
   min-width: 0;
-}
-
-.select-kit .select-kit-header:not(.btn) {
-  padding-top: 0.25em;
-  padding-bottom: 0.25em;
+  min-height: 0;
 }
 
 .select-kit .tag-visible-name-formatted-selection {
@@ -185,6 +183,7 @@ a.discourse-tag,
   gap: 0;
   align-items: center;
   flex: 1 1 0;
+  height: 18px;
   min-width: 0;
   max-width: 100%;
   overflow: hidden;
@@ -205,15 +204,15 @@ a.discourse-tag,
   flex: 0 1 auto;
   min-width: 0;
   max-width: 220px;
-  height: 20px;
-  padding: 1px 6px;
+  height: 18px;
+  padding: 0 5px;
   border: var(--d-button-default-border);
   border-radius: 4px;
   background-color: var(--d-button-default-bg-color);
   color: var(--d-button-default-text-color);
   font-size: var(--font-down-2);
   font-weight: 400;
-  line-height: normal;
+  line-height: 1;
   overflow: hidden;
   white-space: nowrap;
 
@@ -234,9 +233,16 @@ a.discourse-tag,
   }
 
   &.tag-visible-name-style--section {
-    flex: 1 1 0;
+    flex: 1 1 2rem;
     max-width: none;
-    min-width: 0;
+    min-width: 2rem;
     color: var(--primary);
   }
+}
+
+.mobile-view .category-breadcrumb.hidden .native-tag-filter-chooser-item,
+.mobile-view .category-breadcrumb.hidden .native-tag-filter-chooser.select-kit {
+  flex-basis: 100%;
+  width: 100%;
+  max-width: 100%;
 }
