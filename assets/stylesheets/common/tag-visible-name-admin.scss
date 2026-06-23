@@ -159,7 +159,7 @@ a.discourse-tag,
 
 .select-kit .tag-visible-name-formatted-selection {
   display: flex;
-  gap: var(--space-1);
+  column-gap: 4px;
   align-items: center;
   min-width: 0;
   max-width: 100%;
@@ -173,7 +173,11 @@ a.discourse-tag,
   max-width: 160px;
   margin: 0;
   padding: 3px 7px;
+  border: 1px solid transparent;
   border-radius: 4px;
+  background-color: var(--primary-low);
+  color: var(--primary);
+  line-height: var(--line-height-small);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -185,6 +189,8 @@ a.discourse-tag,
   }
 
   &.tag-visible-name-style--section {
+    background-color: var(--primary-low);
+    border-color: var(--primary-low-mid);
     color: var(--primary);
   }
 }
