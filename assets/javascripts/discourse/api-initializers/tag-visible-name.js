@@ -8,6 +8,7 @@ const TAG_SELECTOR =
 const TAG_SELECT_KIT_SELECTOR = 'details.select-kit[class*="tag"]';
 const SELECTED_CHOICE_SELECTOR = `${TAG_SELECT_KIT_SELECTOR} .selected-choice[data-name]`;
 const FORMATTED_SELECTION_SELECTOR = `${TAG_SELECT_KIT_SELECTOR} summary .formatted-selection`;
+const TAG_FILTER_PLACEHOLDER = "Теги";
 
 function tagKey(value) {
   return value?.trim().toLowerCase();
@@ -96,25 +97,78 @@ function updateSelectedChoice(choice, names, styles) {
   }
 }
 
-function updateFormattedSelection(selection, names) {
-  const summary = selection.closest("summary");
-  const tagNames = summary?.dataset.name?.split(",");
+function buildFormattedSelectionTag(tagName, names, styles) {
+  const trimmedName = tagName.trim();
+  const visibleName = visibleNameFor(trimmedName, names) || trimmedName;
+  const tag = document.createElement("span");
 
-  if (!tagNames?.length) {
+  tag.classList.add("discourse-tag", "box", "tag-visible-name-summary-tag");
+  tag.dataset.tagName = trimmedName;
+  tag.textContent = visibleName;
+  tag.title = visibleName;
+  applyStyleClass(tag, styleFor(trimmedName, styles));
+
+  return { element: tag, visibleName };
+}
+
+function resetFormattedSelection(selection) {
+  const summary = selection.closest("summary");
+  const selectKit = selection.closest(TAG_SELECT_KIT_SELECTOR);
+  const placeholder =
+    summary?.dataset.name?.trim() ||
+    (selectKit?.classList.contains("native-tag-filter-chooser")
+      ? TAG_FILTER_PLACEHOLDER
+      : "");
+
+  selection.classList.remove("tag-visible-name-formatted-selection");
+  delete selection.dataset.visibleNameApplied;
+  selection.removeAttribute("title");
+
+  if (
+    selection.querySelector(".tag-visible-name-summary-tag") ||
+    selection.textContent.trim() === ""
+  ) {
+    selection.textContent = placeholder;
+  }
+}
+
+function updateFormattedSelection(selection, names, styles) {
+  const summary = selection.closest("summary");
+  const tagValues = summary?.dataset.value
+    ?.split(",")
+    .map((tagValue) => tagValue.trim())
+    .filter(Boolean);
+  const tagNames = summary?.dataset.name
+    ?.split(",")
+    .map((tagName) => tagName.trim())
+    .filter(Boolean);
+
+  if (!tagValues?.length || !tagNames?.length) {
+    resetFormattedSelection(selection);
     return;
   }
 
-  const visibleNames = tagNames.map((tagName) => {
-    const trimmedName = tagName.trim();
-    return visibleNameFor(trimmedName, names) || trimmedName;
-  });
+  const renderedTags = tagNames.map((tagName) =>
+    buildFormattedSelectionTag(tagName, names, styles)
+  );
+  const visibleNames = renderedTags.map((tag) => tag.visibleName);
   const formattedText = visibleNames.join(", ");
 
-  if (selection.dataset.visibleNameApplied !== formattedText) {
-    selection.textContent = formattedText;
-    selection.title = formattedText;
-    selection.dataset.visibleNameApplied = formattedText;
+  if (
+    selection.dataset.visibleNameApplied === formattedText &&
+    selection.querySelector(".tag-visible-name-summary-tag")
+  ) {
+    return;
   }
+
+  const fragment = document.createDocumentFragment();
+  renderedTags.forEach((tag) => fragment.appendChild(tag.element));
+
+  selection.textContent = "";
+  selection.appendChild(fragment);
+  selection.title = formattedText;
+  selection.dataset.visibleNameApplied = formattedText;
+  selection.classList.add("tag-visible-name-formatted-selection");
 }
 
 function updateTagSelectKitElements(root, names, styles) {
@@ -131,11 +185,11 @@ function updateTagSelectKitElements(root, names, styles) {
   );
 
   if (root.matches?.(FORMATTED_SELECTION_SELECTOR)) {
-    updateFormattedSelection(root, names);
+    updateFormattedSelection(root, names, styles);
   }
 
   root.querySelectorAll?.(FORMATTED_SELECTION_SELECTOR).forEach((element) =>
-    updateFormattedSelection(element, names)
+    updateFormattedSelection(element, names, styles)
   );
 }
 

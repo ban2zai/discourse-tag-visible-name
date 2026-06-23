@@ -156,3 +156,35 @@ a.discourse-tag,
     color: var(--primary);
   }
 }
+
+.select-kit .tag-visible-name-formatted-selection {
+  display: flex;
+  gap: var(--space-1);
+  align-items: center;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.select-kit .tag-visible-name-summary-tag {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 160px;
+  margin: 0;
+  padding: 3px 7px;
+  border-radius: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  &.tag-visible-name-style--area {
+    border: none;
+    background-color: #ffb900;
+    color: #000;
+  }
+
+  &.tag-visible-name-style--section {
+    color: var(--primary);
+  }
+}
