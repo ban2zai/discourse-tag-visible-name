@@ -207,7 +207,7 @@ a.discourse-tag,
   border-radius: 4px;
   background-color: var(--d-button-default-bg-color);
   color: var(--d-button-default-text-color);
-  font-size: var(--font-down-2);
+  font-size: var(--font-down-1);
   font-weight: 400;
   line-height: normal;
   overflow: hidden;
@@ -242,4 +242,29 @@ a.discourse-tag,
   flex-basis: 100%;
   width: 100%;
   max-width: 100%;
+}
+
+.mobile-view .category-breadcrumb {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.mobile-view .category-breadcrumb > li,
+.mobile-view .category-breadcrumb .category-drop,
+.mobile-view .category-breadcrumb .native-tag-filter-chooser-item,
+.mobile-view .category-breadcrumb .native-tag-filter-chooser.select-kit {
+  width: 100%;
+  max-width: 100%;
+}
+
+.mobile-view .category-breadcrumb .native-tag-filter-chooser-item {
+  flex-basis: 100%;
+}
+
+.mobile-view
+  .category-breadcrumb
+  .native-tag-filter-chooser
+  .select-kit-header {
+  margin-bottom: 0;
 }
