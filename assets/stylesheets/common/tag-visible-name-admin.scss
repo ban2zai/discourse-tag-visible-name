@@ -160,19 +160,15 @@ a.discourse-tag,
   }
 }
 
-.select-kit.multi-select .selected-content {
-  gap: var(--space-3);
-}
-
 .native-tag-filter-chooser-item {
-  flex: 1 1 500px;
-  max-width: 500px;
+  flex: 1 1 clamp(300px, 40vw, 560px);
+  max-width: 560px;
 }
 
 .tags-intersection-chooser.select-kit.multi-select,
 .native-tag-filter-chooser.select-kit {
-  width: min(500px, 100%);
-  max-width: 500px;
+  width: clamp(300px, 40vw, 560px);
+  max-width: 100%;
 }
 
 .native-tag-filter-chooser .select-kit-header-wrapper {
@@ -181,7 +177,7 @@ a.discourse-tag,
 
 .select-kit .tag-visible-name-formatted-selection {
   display: flex;
-  column-gap: var(--space-3);
+  gap: 4px;
   align-items: center;
   flex: 1 1 0;
   min-width: 0;
