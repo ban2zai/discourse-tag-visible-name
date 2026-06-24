@@ -1,4 +1,6 @@
+import { computed } from "@ember/object";
 import { apiInitializer } from "discourse/lib/api";
+import { makeArray } from "discourse/lib/helpers";
 import { defaultRenderTag } from "discourse/lib/render-tag";
 
 const STYLE_CLASS_PREFIX = "tag-visible-name-style--";
@@ -51,5 +53,57 @@ export default apiInitializer("1.8.0", (api) => {
       displayName: visibleName || params.displayName,
       extraClass: joinClasses(params.extraClass, styleClass),
     });
+  });
+
+  api.modifyClass("component:selected-choice", {
+    pluginId: "discourse-tag-visible-name-selected-choice",
+
+    itemName: computed("item", function () {
+      const tagName = this.getName(this.item);
+
+      return visibleNameFor(tagName, names) || tagName;
+    }),
+
+    extraClass: computed("item", function () {
+      const tagName = this.getName(this.item);
+
+      return extraClassFor(styleFor(tagName, styles));
+    }),
+  });
+
+  api.modifyClass("component:multi-select/format-selected-content", {
+    pluginId: "discourse-tag-visible-name-format-selected-content",
+
+    formattedContent: computed("content", function () {
+      if (this.content) {
+        return makeArray(this.content)
+          .map((item) => {
+            const tagName = this.getName(item)?.trim();
+
+            return visibleNameFor(tagName, names) || tagName;
+          })
+          .join(", ");
+      } else {
+        return this.getName(this.selectKit.noneItem);
+      }
+    }),
+  });
+
+  api.modifyClass("component:selected-name", {
+    pluginId: "discourse-tag-visible-name-selected-name",
+
+    didReceiveAttrs() {
+      this._super(...arguments);
+
+      const visibleName = visibleNameFor(this.name, names);
+
+      if (visibleName) {
+        this.setProperties({
+          headerLabel: visibleName,
+          headerTitle: visibleName,
+          name: visibleName,
+        });
+      }
+    },
   });
 });
