@@ -160,22 +160,22 @@ a.discourse-tag,
   }
 }
 
+.select-kit .formatted-selection {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+
 .select-kit .tag-visible-name-formatted-selection {
   display: flex;
-  gap: 0;
+  gap: 4px;
   align-items: center;
   flex: 1 1 0;
   min-width: 0;
   max-width: 100%;
   overflow: hidden;
   white-space: nowrap;
-}
-
-.select-kit
-  .tag-visible-name-formatted-selection
-  > .tag-visible-name-summary-tag
-  + .tag-visible-name-summary-tag {
-  margin-left: 4px;
 }
 
 .select-kit .tag-visible-name-summary-tag {
@@ -213,8 +213,8 @@ a.discourse-tag,
   }
 
   &.tag-visible-name-style--section {
-    // flex: 1 1 auto;
-    max-width: none;
+    flex: 1 1 auto;
+    max-width: 100%;
     min-width: 3rem;
     color: var(--primary);
   }

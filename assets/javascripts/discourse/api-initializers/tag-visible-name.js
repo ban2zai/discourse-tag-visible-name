@@ -101,7 +101,9 @@ export default apiInitializer("1.8.0", (api) => {
           })
           .join("");
 
-        return trustHTML(content);
+        return trustHTML(
+          `<span class="tag-visible-name-formatted-selection">${content}</span>`
+        );
       } else {
         return this.getName(this.selectKit.noneItem);
       }
