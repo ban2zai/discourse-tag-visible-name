@@ -1,7 +1,9 @@
 import { computed } from "@ember/object";
+import { trustHTML } from "@ember/template";
 import { apiInitializer } from "discourse/lib/api";
 import { makeArray } from "discourse/lib/helpers";
 import { defaultRenderTag } from "discourse/lib/render-tag";
+import { escapeExpression } from "discourse/lib/utilities";
 
 const STYLE_CLASS_PREFIX = "tag-visible-name-style--";
 const DEFAULT_STYLE = "default";
@@ -30,6 +32,16 @@ function extraClassFor(style) {
 
 function joinClasses(...classes) {
   return classes.filter(Boolean).join(" ");
+}
+
+function summaryTagHtml(tagName, names, styles) {
+  const visibleName = visibleNameFor(tagName, names) || tagName;
+  const styleClass = extraClassFor(styleFor(tagName, styles));
+  const classes = joinClasses("tag-visible-name-summary-tag", styleClass);
+
+  return `<span class="${classes}" title="${escapeExpression(
+    visibleName
+  )}"><span class="d-button-label">${escapeExpression(visibleName)}</span></span>`;
 }
 
 export default apiInitializer("1.8.0", (api) => {
@@ -64,11 +76,16 @@ export default apiInitializer("1.8.0", (api) => {
       return visibleNameFor(tagName, names) || tagName;
     }),
 
-    extraClass: computed("item", function () {
-      const tagName = this.getName(this.item);
+    didReceiveAttrs() {
+      this._super(...arguments);
 
-      return extraClassFor(styleFor(tagName, styles));
-    }),
+      const tagName = this.getName(this.item);
+      const styleClass = extraClassFor(styleFor(tagName, styles));
+
+      if (styleClass || this.extraClass?.startsWith(STYLE_CLASS_PREFIX)) {
+        this.set("extraClass", styleClass);
+      }
+    },
   });
 
   api.modifyClass("component:multi-select/format-selected-content", {
@@ -76,13 +93,15 @@ export default apiInitializer("1.8.0", (api) => {
 
     formattedContent: computed("content", function () {
       if (this.content) {
-        return makeArray(this.content)
+        const content = makeArray(this.content)
           .map((item) => {
             const tagName = this.getName(item)?.trim();
 
-            return visibleNameFor(tagName, names) || tagName;
+            return summaryTagHtml(tagName, names, styles);
           })
-          .join(", ");
+          .join("");
+
+        return trustHTML(content);
       } else {
         return this.getName(this.selectKit.noneItem);
       }
@@ -99,7 +118,7 @@ export default apiInitializer("1.8.0", (api) => {
 
       if (visibleName) {
         this.setProperties({
-          headerLabel: visibleName,
+          headerLabel: trustHTML(summaryTagHtml(this.name, names, styles)),
           headerTitle: visibleName,
           name: visibleName,
         });
