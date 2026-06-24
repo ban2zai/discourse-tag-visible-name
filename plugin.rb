@@ -59,3 +59,21 @@ end
 
 require_relative "lib/discourse_tag_visible_name/engine"
 require_relative "lib/discourse_tag_visible_name/tag_visible_name_store"
+
+after_initialize do
+  add_to_serializer(:site, :tag_visible_names) do
+    if SiteSetting.tag_visible_name_enabled
+      ::DiscourseTagVisibleName::TagVisibleNameStore.mapping
+    else
+      {}
+    end
+  end
+
+  add_to_serializer(:site, :tag_visible_styles) do
+    if SiteSetting.tag_visible_name_enabled
+      ::DiscourseTagVisibleName::TagVisibleNameStore.public_style_mapping
+    else
+      {}
+    end
+  end
+end
