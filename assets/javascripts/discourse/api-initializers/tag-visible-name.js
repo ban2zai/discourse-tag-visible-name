@@ -7,6 +7,7 @@ import { escapeExpression } from "discourse/lib/utilities";
 
 const STYLE_CLASS_PREFIX = "tag-visible-name-style--";
 const DEFAULT_STYLE = "default";
+const PROBE_COMPAT_STYLE_ID = "tag-visible-name-probe-compat";
 
 function tagNameFor(tag) {
   return typeof tag === "string" ? tag : tag?.name;
@@ -59,27 +60,42 @@ function summaryTagHtml(tagName, names, styles) {
   )}"><span class="d-button-label">${escapeExpression(label)}</span></span>`;
 }
 
-function patchTagSubscriptions(api, names) {
-  api.modifyClass(
-    "component:tag-subscriptions",
-    (Superclass) =>
-      class extends Superclass {
-        displayName(slug) {
-          const visibleName = visibleNameFor(slug, names);
+function cssString(value) {
+  return String(value ?? "")
+    .replace(/\\/g, "\\\\")
+    .replace(/"/g, '\\"')
+    .replace(/\r?\n/g, "\\A ");
+}
 
-          if (visibleName) {
-            return visibleName;
-          }
+function installProbeCompatCss(names) {
+  if (typeof document === "undefined") {
+    return;
+  }
 
-          if (typeof super.displayName === "function") {
-            return super.displayName(...arguments);
-          }
+  const rules = Object.entries(names)
+    .filter(([, visibleName]) => visibleName)
+    .map(
+      ([tagName, visibleName]) =>
+        `a.discourse-tag[data-tag-name="${cssString(
+          tagName
+        )}"][style*="-9999px"]::before{content:"${cssString(visibleName)}";}`
+    )
+    .join("\n");
 
-          return slug;
-        }
-      },
-    { ignoreMissing: true }
-  );
+  let style = document.getElementById(PROBE_COMPAT_STYLE_ID);
+
+  if (!rules) {
+    style?.remove();
+    return;
+  }
+
+  if (!style) {
+    style = document.createElement("style");
+    style.id = PROBE_COMPAT_STYLE_ID;
+    document.head.appendChild(style);
+  }
+
+  style.textContent = rules;
 }
 
 export default apiInitializer("1.8.0", (api) => {
@@ -93,7 +109,7 @@ export default apiInitializer("1.8.0", (api) => {
   const names = site?.tag_visible_names || {};
   const styles = site?.tag_visible_styles || {};
 
-  patchTagSubscriptions(api, names);
+  installProbeCompatCss(names);
 
   api.replaceTagRenderer((tag, params = {}) => {
     const tagName = tagNameFor(tag);
