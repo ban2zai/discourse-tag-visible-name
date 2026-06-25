@@ -13,15 +13,29 @@ function tagNameFor(tag) {
 }
 
 function tagKey(value) {
-  return value?.trim().toLowerCase();
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  return String(value).trim().toLowerCase();
 }
 
 function visibleNameFor(tagName, names) {
-  return names[tagKey(tagName)];
+  const key = tagKey(tagName);
+
+  return key ? names[key] : null;
 }
 
 function styleFor(tagName, styles) {
-  return styles[tagKey(tagName)] || DEFAULT_STYLE;
+  const key = tagKey(tagName);
+
+  return key ? styles[key] || DEFAULT_STYLE : DEFAULT_STYLE;
+}
+
+function hasVisibleTagConfig(tagName, names, styles) {
+  const key = tagKey(tagName);
+
+  return Boolean(key && (names[key] || styles[key]));
 }
 
 function extraClassFor(style) {
@@ -36,12 +50,13 @@ function joinClasses(...classes) {
 
 function summaryTagHtml(tagName, names, styles) {
   const visibleName = visibleNameFor(tagName, names) || tagName;
+  const label = String(visibleName ?? "");
   const styleClass = extraClassFor(styleFor(tagName, styles));
   const classes = joinClasses("tag-visible-name-summary-tag", styleClass);
 
   return `<span class="${classes}" title="${escapeExpression(
-    visibleName
-  )}"><span class="d-button-label">${escapeExpression(visibleName)}</span></span>`;
+    label
+  )}"><span class="d-button-label">${escapeExpression(label)}</span></span>`;
 }
 
 export default apiInitializer("1.8.0", (api) => {
@@ -93,9 +108,27 @@ export default apiInitializer("1.8.0", (api) => {
 
     formattedContent: computed("content", function () {
       if (this.content) {
-        const content = makeArray(this.content)
+        const items = makeArray(this.content);
+
+        if (
+          !items.some((item) =>
+            hasVisibleTagConfig(this.getName(item), names, styles)
+          )
+        ) {
+          return items
+            .map((item) => {
+              const name = this.getName(item);
+
+              return name === null || name === undefined
+                ? ""
+                : String(name).trim();
+            })
+            .join(", ");
+        }
+
+        const content = items
           .map((item) => {
-            const tagName = this.getName(item)?.trim();
+            const tagName = this.getName(item);
 
             return summaryTagHtml(tagName, names, styles);
           })
