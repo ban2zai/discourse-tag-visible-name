@@ -59,6 +59,29 @@ function summaryTagHtml(tagName, names, styles) {
   )}"><span class="d-button-label">${escapeExpression(label)}</span></span>`;
 }
 
+function patchTagSubscriptions(api, names) {
+  api.modifyClass(
+    "component:tag-subscriptions",
+    (Superclass) =>
+      class extends Superclass {
+        displayName(slug) {
+          const visibleName = visibleNameFor(slug, names);
+
+          if (visibleName) {
+            return visibleName;
+          }
+
+          if (typeof super.displayName === "function") {
+            return super.displayName(...arguments);
+          }
+
+          return slug;
+        }
+      },
+    { ignoreMissing: true }
+  );
+}
+
 export default apiInitializer("1.8.0", (api) => {
   const siteSettings = api.container.lookup("service:site-settings");
 
@@ -69,6 +92,8 @@ export default apiInitializer("1.8.0", (api) => {
   const site = api.container.lookup("service:site");
   const names = site?.tag_visible_names || {};
   const styles = site?.tag_visible_styles || {};
+
+  patchTagSubscriptions(api, names);
 
   api.replaceTagRenderer((tag, params = {}) => {
     const tagName = tagNameFor(tag);
